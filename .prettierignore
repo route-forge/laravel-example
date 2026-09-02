@@ -1,0 +1,32 @@
+# 依赖与产物
+/node_modules/
+/vendor/
+/public/build/
+/public/hot
+/public/storage
+/public/fonts-manifest.dev.json
+/storage/
+/.idea/
+
+# Laravel 相关
+app
+bootstrap
+config
+database
+routes
+tests
+
+# 锁文件与生成物（有各自的格式约定，不由 Prettier 接管）
+pnpm-lock.yaml
+package-lock.json
+composer.lock
+composer.json
+resources/js/types/*.d.ts
+
+# Blade 模板：Prettier 的 HTML 解析器无法处理 @if/@{{ config('x', 'y') }} 等指令，
+# 强行解析会直接报错，因此整体排除；Blade 的缩进由 .editorconfig + 手工保证。
+resources/views/**/*.blade.php
+
+# 兜底
+*.min.js
+*.min.css

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/jsconfig",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "preserve",
+    "resolveJsonModule": true,
+    "verbatimModuleSyntax": true,
+    "noImplicitAny": false,
+    "strict": false,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["resources/js/*"]
+    },
+    "types": ["vite/client"]
+  },
+  "include": [
+    "resources/js/**/*.js",
+    "resources/js/**/*.vue",
+    "resources/js/types/*.d.ts",
+    "uno.config.js",
+    "prettier.config.js",
+    "vite.config.js"
+  ],
+  "exclude": ["node_modules", "vendor", "public/build", "storage"]
+}

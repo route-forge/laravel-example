@@ -16,3 +16,8 @@ indent_size = 2
 
 [{compose,docker-compose}.{yml,yaml}]
 indent_size = 4
+
+# 前端与模板统一 2 空格，与 prettier.config.js 的 tabWidth 保持一致
+# （Prettier 3 CLI 默认读取 .editorconfig，此处 indent_size 会覆盖 prettier 的 tabWidth）
+[*.{blade.php,css,html,js,json,pug,jsx,tsx,ts,vue}]
+indent_size = 2

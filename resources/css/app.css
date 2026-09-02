@@ -1,9 +1,48 @@
-@import 'tailwindcss';
+/**
+ * 全局基线样式 —— 不引入任何 CSS 框架。
+ *
+ * UnoCSS 的工具类与 reset 由 `virtual:uno.css`（在 resources/js/app.js 中 import）注入；
+ * 本文件只提供「单一真值源」的设计变量与少量页面基线。
+ *
+ * 注意加载顺序：Element Plus 的组件样式是经 JS 依赖图由 Vite 注入的，
+ * dev 下总是晚于本文件的 <link>，因此与它同选择器（:root）竞争必输 ——
+ * 下面覆盖 --el-* 变量时用了 :root:root 提高特异度，而不是依赖顺序侥幸。
+ */
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+:root {
+  /* 字体栈：Instrument Sans（@fonts 自托管）负责拉丁字形，中文回退到系统字体 */
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'PingFang SC', 'Hiragino Sans GB',
+  'Microsoft YaHei', 'Noto Sans SC', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+  'Noto Color Emoji';
+  --font-serif: 'Songti SC', 'SimSun', ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Consolas, monospace;
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-    'Segoe UI Symbol', 'Noto Color Emoji';
+  /* 品牌色基线，UnoCSS 侧的 brand-* 工具类在 uno.config.js 的 theme.colors 中同名维护 */
+  --brand: #1668ac;
+}
+
+/* 让 Element Plus 的排版继承上面的字体栈与品牌色，而非它自带的默认值 */
+:root:root {
+  --el-font-family: var(--font-sans);
+  --el-color-primary: var(--brand);
+  --el-border-radius-base: 8px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #fff;
+  color: #1f2937;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Vue 挂载点：未加载完时的骨架由 Blade 里的占位块提供，挂载后整体替换 */
+#app {
+  min-height: 100vh;
 }

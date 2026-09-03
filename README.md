@@ -1,75 +1,133 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <strong>route-forge × Laravel</strong>
+  <br>
+  <sub>一套完整的「命名路由 → 类型安全 → 前后端联动」示例仓库</sub>
 </p>
 
-## About Laravel
+<p align="center">
+  <img src="https://img.shields.io/badge/PHP-8.5%2B-777BB4?style=flat-square&logo=php" alt="PHP" />
+  <img src="https://img.shields.io/badge/Laravel-13.x-FF2D20?style=flat-square&logo=laravel" alt="Laravel" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+</p>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must
-be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of
-development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session)
-  and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 这是什么
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+这是 **route-forge 生态的官方整合示例仓库**，用来演示如何把 Laravel 的命名路由变成前端也能类型安全消费的 `route()` 函数。
 
-## Learning Laravel
+本仓库采用**分支分流**策略：后端 Laravel 代码在 `main` 作为基础，Vue 和 React 两套前端方案分别在独立分支完整实现。
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video
-tutorial library of all modern web application frameworks, making it a breeze to get started with
-the framework.
+## 分支说明
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of
-topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging
-into our comprehensive video library.
+| 分支 | 前端栈 | 说明 |
+|------|--------|------|
+| `main` | （纯 Laravel 后端基座） | 仓库入口，只保留初始化的 Laravel 骨架 + route-forge 后端包接入 |
+| `vue` | Vue 3 + Element Plus + UnoCSS | 完整的 Vue 版企业画册示例，含 `.docs/` 全套文档 |
+| `react` | React 19 + Ant Design + UnoCSS | 完整的 React 版企业画册示例，含 `.docs/` 全套文档 |
 
-You can also watch bite-sized lessons with real-world projects
-on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel
-application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code,
-Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your
-AI workflow:
+切换到对应分支即可查看完整示例和文档：
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git checkout vue    # Vue 版
+git checkout react  # React 版
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while
-following best practices.
+## route-forge 生态
 
-## Contributing
+route-forge 拆成三个包，分别覆盖后端 → 上下文 → 前端三层：
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found
-in the [Laravel documentation](https://laravel.com/docs/contributions).
+```
+route-forge/laravel (后端 PHP 包)
+        │
+        │  命名路由 → forge 上下文 JSON → Blade @forgeSummary 注入
+        ▼
+  @route-forge/core (前端 TS 核心库)
+        │
+        │  解析 forge 上下文 → 框架无关的 route() 函数 + 类型定义
+        ▼
+  @route-forge/react / @route-forge/vue (框架适配器)
+        React: RouteForgeProvider + useRouteForge() Hook
+        Vue:   createRouteForgePlugin() + useRouteForge() 组合式 API
+```
 
-## Code of Conduct
+### route-forge/laravel（后端）
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by
-the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+把 Laravel 路由表中的命名路由导出成 forge 上下文 JSON，供前端消费。
 
-## Security Vulnerabilities
+```php
+// 1. 安装
+composer require route-forge/laravel
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell
-via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly
-addressed.
+// 2. 定义命名路由
+Route::name('catalog.show')->get('/catalog/{slug}', [CatalogController::class, 'show']);
+
+// 3. Blade 中注入 forge 上下文
+// resources/views/layout.blade.php
+@forgeSummary
+// 这一行会在 HTML 里注入 window.__FORGE__ = { routes: { ... }, ... }
+```
+
+### @route-forge/core（前端 TS 核心）
+
+框架无关的 `route()` 实现，负责解析 forge 上下文 JSON 并提供 URL 生成能力。
+
+```ts
+import { createForge } from '@route-forge/core';
+
+// 手动创建（适用于纯 JS / 非组件上下文）
+const forge = createForge(window.__FORGE__);
+forge.route('catalog.show', { slug: 'hello' }); // → "/catalog/hello"
+```
+
+### 框架适配器
+
+**React 版 — `@route-forge/react`：**
+
+```tsx
+// main.tsx
+import { RouteForgeProvider } from '@route-forge/react';
+
+createRoot(document.getElementById('root')!).render(
+  <RouteForgeProvider>
+    <App />
+  </RouteForgeProvider>
+);
+
+// 组件内使用
+function Nav() {
+  const { route } = useRouteForge();
+  return <Link to={route('catalog.show', { slug: 'hello' })}>画册</Link>;
+}
+```
+
+**Vue 版 — `@route-forge/vue`：**
+
+```js
+// app.js
+import { createRouteForgePlugin } from '@route-forge/vue';
+
+const app = createApp(App);
+const forge = createRouteForgePlugin({});
+app.use(forge);
+forge.ready().then(() => app.mount('#app'));
+```
+
+## 快速开始
+
+```bash
+# 1. 进入你想看的前端版本分支
+git checkout react   # 或 vue
+
+# 2. 一键安装（后端 + 前端）
+composer setup
+
+# 3. 本地开发
+composer dev
+```
+
+更详细的安装步骤、技术栈说明和架构解析，请切换到对应分支查看 `README.md` 和 `.docs/` 目录。
 
 ## License
 
-The Laravel framework is open-sourced software licensed under
-the [MIT license](https://opensource.org/licenses/MIT).
+MIT © route-forge

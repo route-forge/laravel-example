@@ -22,8 +22,21 @@
 <body class="bg-white text-gray-800 antialiased">
 {{-- #app 内的占位块会在 Vue 挂载时被整体替换，只为避免首屏纯白 --}}
 <div id="app">
-  <div class="flex min-h-screen items-center justify-center">
-    <p class="text-sm text-gray-400">正在加载画册…</p>
+  <style>
+    .loading {
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+
+      > p {
+        font-size: 16px;
+        color: #999;
+      }
+    }
+  </style>
+  <div class="loading">
+    <p>正在加载画册…</p>
   </div>
 </div>
 @forgeSummary

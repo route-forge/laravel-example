@@ -18,8 +18,6 @@ tests
 
 # 锁文件与生成物（有各自的格式约定，不由 Prettier 接管）
 pnpm-lock.yaml
-package-lock.json
-composer.lock
 composer.json
 resources/js/types/*.d.ts
 

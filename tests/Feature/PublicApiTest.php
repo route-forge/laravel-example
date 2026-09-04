@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Catalog;
 use App\Models\CatalogPage;
+use App\Models\Category;
 use App\Models\ContactMessage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -29,6 +30,27 @@ class PublicApiTest extends TestCase
         $this->assertSame(2, $response->json('data.0.page_count'));
         $this->assertSame(1, $response->json('meta.total'));
         $this->assertArrayNotHasKey('pages', $response->json('data.0'), '列表不应带整本页面');
+    }
+
+    public function test_列表与详情都带归属分类(): void
+    {
+        $category = Category::query()->create(['name' => '公司宣传', 'slug' => 'company']);
+        $catalog = Catalog::factory()->published()->create(['category_id' => $category->id]);
+
+        $this->getJson('/api/catalogs')
+            ->assertOk()
+            ->assertJsonPath('data.0.category.slug', 'company');
+
+        $this->getJson("/api/catalogs/{$catalog->slug}")
+            ->assertOk()
+            ->assertJsonPath('data.category.name', '公司宣传');
+    }
+
+    public function test_站点基础资料可公开读取(): void
+    {
+        $this->getJson('/api/site')
+            ->assertOk()
+            ->assertJsonPath('data.site_name', '我的企业');
     }
 
     public function test_详情按页序返回整本内容(): void

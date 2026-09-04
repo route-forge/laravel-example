@@ -26,6 +26,8 @@ class CatalogResource extends JsonResource
             'theme_color'  => $this->theme_color,
             'status'       => $this->status,
             'published_at' => $this->published_at?->toIso8601String(),
+            // 归属分类（未分类为 null）；调用方 with('category') 时才携带
+            'category'     => $this->whenLoaded('category', fn () => new CategoryResource($this->category)),
             // withCount 命中时读原始聚合列；未 withCount 的调用方退化成一次 count 查询，
             // 保证 page_count 恒在（whenCounted 的 MissingValue 会让键整个消失，前端拿 undefined）
             'page_count'   => $this->resource->pages_count ?? $this->pages()->count(),

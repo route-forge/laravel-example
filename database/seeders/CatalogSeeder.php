@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Catalog;
 use App\Models\CatalogPage;
+use App\Models\Category;
 use Illuminate\Database\Seeder;
 
 /**
@@ -16,9 +17,12 @@ class CatalogSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->brandCatalog();
-        $this->productCatalog();
-        $this->serviceCatalog();
+        // 依赖 CategorySeeder 先行（DatabaseSeeder 保证顺序）
+        $categoryIds = Category::query()->pluck('id', 'slug');
+
+        $this->brandCatalog($categoryIds['company'] ?? null);
+        $this->productCatalog($categoryIds['products'] ?? null);
+        $this->serviceCatalog($categoryIds['services'] ?? null);
         $this->draftCatalog();
     }
 
@@ -44,11 +48,12 @@ class CatalogSeeder extends Seeder
         return $catalog;
     }
 
-    private function brandCatalog(): void
+    private function brandCatalog(?int $categoryId = null): void
     {
         $this->make(
             [
                 'slug'         => 'xingye-brand-2026',
+                'category_id'  => $categoryId,
                 'title'        => '星野智能 · 2026 品牌画册',
                 'subtitle'     => '把工业现场的数据，变成可执行的判断',
                 'theme_color'  => '#1668ac',
@@ -114,11 +119,12 @@ class CatalogSeeder extends Seeder
         );
     }
 
-    private function productCatalog(): void
+    private function productCatalog(?int $categoryId = null): void
     {
         $this->make(
             [
                 'slug'         => 'yunshu-products-2026',
+                'category_id'  => $categoryId,
                 'title'        => '云枢制造 · 精密结构件产品手册',
                 'subtitle'     => '五轴加工中心群与全自动检测线',
                 'theme_color'  => '#0f568f',
@@ -168,11 +174,12 @@ class CatalogSeeder extends Seeder
         );
     }
 
-    private function serviceCatalog(): void
+    private function serviceCatalog(?int $categoryId = null): void
     {
         $this->make(
             [
                 'slug'         => 'munan-services',
+                'category_id'  => $categoryId,
                 'title'        => '木南设计 · 品牌与空间服务介绍',
                 'subtitle'     => '给实业公司做一遍能被读懂的表达',
                 'theme_color'  => '#8a5a2b',

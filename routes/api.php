@@ -5,12 +5,16 @@
  */
 
 use App\Http\Controllers\Api\CatalogController;
+use App\Http\Controllers\Api\CategoryController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\SiteSettingController;
 use App\Http\Controllers\Manage\AuthController;
 use App\Http\Controllers\Manage\BootstrapController;
 use App\Http\Controllers\Manage\CatalogController as ManageCatalogController;
+use App\Http\Controllers\Manage\CategoryController as ManageCategoryController;
 use App\Http\Controllers\Manage\MessageController;
 use App\Http\Controllers\Manage\PageController;
+use App\Http\Controllers\Manage\SiteSettingController as ManageSiteSettingController;
 use Illuminate\Routing\RouteFileRegistrar;
 use Illuminate\Routing\Router;
 
@@ -39,6 +43,8 @@ $this->router->group([], function (Router $r) {
     $r->tier('public')->name('api.')->group(function (Router $r) {
         $r->get('/catalogs', [CatalogController::class, 'index'])->name('catalogs.index');
         $r->get('/catalogs/{slug}', [CatalogController::class, 'show'])->name('catalogs.show');
+        $r->get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+        $r->get('/site', [SiteSettingController::class, 'show'])->name('site.show');
         $r->post('/contact', [ContactController::class, 'store'])->name('contact.store');
     });
 
@@ -74,6 +80,16 @@ $this->router->group([], function (Router $r) {
         $r->post('/manage/catalogs/{catalog}/pages/reorder', [PageController::class, 'reorder'])->name('catalogs.pages.reorder');
         $r->put('/manage/pages/{page}', [PageController::class, 'update'])->name('pages.update');
         $r->delete('/manage/pages/{page}', [PageController::class, 'destroy'])->name('pages.destroy');
+
+        // 分类维护
+        $r->get('/manage/categories', [ManageCategoryController::class, 'index'])->name('categories.index');
+        $r->post('/manage/categories', [ManageCategoryController::class, 'store'])->name('categories.store');
+        $r->post('/manage/categories/reorder', [ManageCategoryController::class, 'reorder'])->name('categories.reorder');
+        $r->put('/manage/categories/{category}', [ManageCategoryController::class, 'update'])->name('categories.update');
+        $r->delete('/manage/categories/{category}', [ManageCategoryController::class, 'destroy'])->name('categories.destroy');
+
+        // 站点基础资料（singleton）
+        $r->put('/manage/site', [ManageSiteSettingController::class, 'update'])->name('site.update');
 
         // 留言
         $r->get('/manage/messages', [MessageController::class, 'index'])->name('messages.index');

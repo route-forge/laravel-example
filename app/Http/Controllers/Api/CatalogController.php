@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
- * 公开画册数据接口（level = public，靠 config/forge.php 的 match.prefix: ['api'] 归级）。
+ * 公开画册数据接口（level = public，显式 tier('public') 归级）。
  *
  * 前端调用方式：useForgeApi('public') → api('api.catalogs.index', { query: {...} })。
  */
@@ -19,11 +19,17 @@ class CatalogController extends Controller
     {
         $perPage = min(max($request->integer('per_page', 9), 1), 30);
 
+        $query = Catalog::published()
+            ->with('category')
+            ->withCount('pages');
+
+        // 分类筛选：传分类 slug（列表页筛选条的值），无效 slug 自然得到空列表
+        if ($slug = trim((string) $request->query('category'))) {
+            $query->whereHas('category', fn ($q) => $q->where('slug', $slug));
+        }
+
         return CatalogResource::collection(
-            Catalog::published()
-                ->withCount('pages')
-                ->paginate($perPage)
-                ->withQueryString(),
+            $query->paginate($perPage)->withQueryString(),
         );
     }
 
@@ -33,7 +39,7 @@ class CatalogController extends Controller
     public function show(string $slug): CatalogResource
     {
         $catalog = Catalog::published()
-            ->with('pages')
+            ->with(['pages', 'category'])
             ->withCount('pages')
             ->where('slug', $slug)
             ->firstOrFail();

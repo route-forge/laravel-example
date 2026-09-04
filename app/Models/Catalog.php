@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * 一本企业画册（前台翻页的最小完整单位）。
  */
 #[Fillable([
-    'slug', 'title', 'subtitle', 'cover_image', 'theme_color', 'summary', 'status', 'published_at', 'sort_order',
+    'slug', 'category_id', 'title', 'subtitle', 'cover_image', 'theme_color', 'summary', 'status', 'published_at', 'sort_order',
 ])]
 class Catalog extends Model
 {
@@ -30,6 +31,14 @@ class Catalog extends Model
             'published_at' => 'datetime',
             'sort_order'   => 'integer',
         ];
+    }
+
+    /**
+     * @return BelongsTo<Category, $this>
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
     }
 
     /**

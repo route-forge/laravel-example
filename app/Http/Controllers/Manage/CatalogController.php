@@ -10,7 +10,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Validation\Rule;
 
 /**
- * 管理端画册 CRUD（level = manage，URI 前缀 manage，中间件 manage 保护）。
+ * 管理端画册 CRUD（level = manage，web + manage 中间件保护）。
  *
  * 与公开接口的关键差别：这里能看到 draft，且默认不带 pages（编辑时单独取）。
  */
@@ -18,7 +18,7 @@ class CatalogController extends Controller
 {
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Catalog::query()->withCount('pages');
+        $query = Catalog::query()->with(['category'])->withCount('pages');
 
         if ($keyword = trim((string) $request->query('keyword'))) {
             $query->where(fn($q) => $q
@@ -37,7 +37,7 @@ class CatalogController extends Controller
 
     public function show(Catalog $catalog): CatalogResource
     {
-        return new CatalogResource($catalog->load('pages'));
+        return new CatalogResource($catalog->load(['pages', 'category']));
     }
 
     public function store(Request $request): CatalogResource
@@ -75,6 +75,7 @@ class CatalogController extends Controller
                 'subtitle'    => ['nullable', 'string', 'max:200'],
                 'summary'     => ['nullable', 'string', 'max:2000'],
                 'cover_image' => ['nullable', 'string', 'max:500'],
+                'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')],
                 'theme_color' => ['required', 'regex:/^#[0-9a-fA-F]{6}$/'],
                 'status'      => ['required', Rule::in([Catalog::STATUS_DRAFT, Catalog::STATUS_PUBLISHED])],
                 'sort_order'  => ['nullable', 'integer', 'min:0', 'max:999'],

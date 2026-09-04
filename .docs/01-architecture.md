@@ -2,10 +2,6 @@
 
 > 读完本文你会理解三件事：route-forge 三包各自做什么、本项目「前后端分离」的请求链路长什么样、
 > 以及 forge 摘要为什么要分层级（levels）。
->
-> 📌 本仓库分支分流：main = 共享后端基座 + 完整文档，vue / react = 两套前端。本文的前端示例以
-> Vue 版书写，React 侧对应关系见 react 分支同名文档（`<RouteForgeProvider>` +
-> `useForgeRoute(level, name)` + `ForgeLink`）。
 
 ---
 

@@ -25,3 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+resources/js/types/auto-imports.d.ts
+resources/js/types/components.d.ts
+resources/js/types/route-forge.d.ts

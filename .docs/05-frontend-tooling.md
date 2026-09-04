@@ -1,7 +1,7 @@
 # 05 · 前端工程化：UnoCSS + Pug + Element Plus
 
 > 本文聚焦本项目前端基座的「怎么搭起来」—— Vite 插件链的执行顺序、为什么选 Pug、Element Plus
-> 按需引入的配置细节、Blade 与 Vue 的样式边界。这些是本项目 P0 阶段的核心工程决策。
+> 按需引入的配置细节、唯一 Blade 壳下的样式分层。这些是前端基座的核心工程决策。
 
 ---
 
@@ -13,7 +13,7 @@
 - [Pug 模板缩进语法](#pug-模板缩进语法)
 - [Element Plus 按需引入](#element-plus-按需引入)
 - [CSS 注入顺序陷阱](#css-注入顺序陷阱)
-- [Blade 与 Vue 的样式边界](#blade-与-vue-的样式边界)
+- [唯一 Blade 壳下的样式分层](#唯一-blade-壳下的样式分层)
 
 ---
 
@@ -96,7 +96,7 @@ Components({
 })
 ```
 
-- **作用**：组件按需引入 —— 模板里写 `<el-button>` 不需要 import，写 `<FeatureCard>` 也不需要注册
+- **作用**：组件按需引入 —— 模板里写 `<el-button>` 不需要 import，写 `<CatalogCard>` 也不需要注册
 - `dirs` 扫描自定义组件目录，自动注册全局可用
 - `ElementPlusResolver()` 解析 `<el-xxx>` 组件和 `v-loading` 等指令
 
@@ -294,7 +294,7 @@ Element Plus 的组件样式和 UnoCSS 的工具类特异性很接近，必须�
 ### 本项目的顺序安排
 
 ```blade
-{{-- layout.blade.php --}}
+{{-- resources/views/index.blade.php（唯一 Blade 壳）--}}
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 ```
 
@@ -306,33 +306,36 @@ import 'virtual:uno.css';  // UnoCSS preflight + 工具类（最后求值）
 执行顺序：
 
 ```
-1. Element Plus 组件库样式（随 JS 依赖图先注入）
-2. virtual:uno.css（UnoCSS，最后注入）
+1. resources/css/app.css —— Blade @vite 里的独立入口，基线变量最先落位
+2. Element Plus 组件库样式（随 JS 依赖图注入）
+3. virtual:uno.css（UnoCSS preflight + 工具类，最后注入）
 → UnoCSS 的 .bg-brand-500 能覆盖 Element Plus 默认背景色 ✅
 ```
 
 如果把 UnoCSS 放在 Element Plus 之前，`bg-brand-500` 就会被 Element Plus 的默认背景覆盖 —— 表现为「class
 写了但颜色没变」，非常隐蔽。
 
-## Blade 与 Vue 的样式边界
+## 唯一 Blade 壳下的样式分层
 
-本项目是 Blade 做壳、Vue 做内容的混合架构，样式分三层：
+前后端分离后，Blade 只剩一个壳（`index.blade.php`），样式分四层：
 
-| 层             | 载体                                 | 作用                                 | 示例                     |
-|----------------|--------------------------------------|--------------------------------------|--------------------------|
-| **Blade 层**   | `resources/css/app.css` + Blade 内联 | 全站基线样式、UnoCSS preflight       | `body { ... }`, `@fonts` |
-| **Vue 全局层** | `virtual:uno.css` + 组件库样式       | UnoCSS 工具类、Element Plus 默认样式 | `.mt-8`, `.el-button`    |
-| **Vue 组件层** | `<style scoped>`                     | 组件私有样式                         | `.eyebrow`, `.chip`      |
+| 层             | 载体                                      | 作用                         | 示例                     |
+|----------------|-------------------------------------------|------------------------------|--------------------------|
+| **Blade 壳层** | `resources/css/app.css`（@vite 独立入口） | 全站基线变量、字体           | `body { ... }`, `@fonts` |
+| **UnoCSS 层**  | `virtual:uno.css`（app.js 里最后 import） | preflight、工具类、shortcuts | `.mt-8`, `.shell`        |
+| **组件库层**   | Element Plus 按需样式（随 JS 依赖图注入） | 组件默认样式                 | `.el-button`             |
+| **Vue 组件层** | `<style scoped>` + `@apply`               | 组件私有样式                 | `.eyebrow`, `.chip`      |
 
-### Blade 模板里也能用 UnoCSS
+### Blade 壳里的原子类
 
 ```blade
-{{-- layout.blade.php --}}
+{{-- index.blade.php --}}
 <body class="bg-white text-gray-800 antialiased">
 ```
 
-之所以能生效，是因为 `uno.config.js` 的 `content.filesystem` 包含了 `resources/views/**/*.blade.php`
-。UnoCSS 会扫描 Blade 文件里的 class 名并生成对应 CSS。
+之所以能生效，是因为 `uno.config.js` 的 `content.filesystem` 包含
+`resources/views/**/*.blade.php`。UnoCSS 会扫描 Blade 文件里的 class 名并生成对应 CSS ——
+壳里这几个类同时也是「扫描链路是否健康」的验收样例。
 
 ### 组件 `<style scoped>` 里的 @apply
 

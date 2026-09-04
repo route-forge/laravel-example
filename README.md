@@ -1,7 +1,7 @@
 <p align="center">
-  <strong>route-forge × Laravel</strong>
+  <strong>route-forge × Laravel · 企业画册</strong>
   <br>
-  <sub>一套完整的「命名路由 → 类型安全 → 前后端联动」企业画册示例</sub>
+  <sub>前后端分离架构下「命名路由 → 类型安全 → 前后端联动」的官方整合示例</sub>
 </p>
 
 <p align="center">
@@ -17,10 +17,10 @@
 ## 目录
 
 - [这是什么](#这是什么)
-- [项目亮点](#项目亮点)
+- [整体架构](#整体架构)
+- [功能规划](#功能规划)
 - [快速开始](#快速开始)
 - [技术栈](#技术栈)
-- [项目结构](#项目结构)
 - [route-forge 在本项目中的用法](#route-forge-在本项目中的用法)
 - [文档导航](#文档导航)
 - [Roadmap](#roadmap)
@@ -30,25 +30,63 @@
 
 ## 这是什么
 
-这是一个 **Laravel + Vue 3 企业画册**，同时也是 **route-forge 生态的官方整合示例**。
+这是一个 **企业宣传画册**，同时也是 **route-forge 生态的官方整合示例**，覆盖三包：
+
+| 包                    | 侧  | 作用                                    |
+|-----------------------|-----|-----------------------------------------|
+| `route-forge/laravel` | PHP | 命名路由 → forge 摘要 → Blade 指令注入  |
+| `@route-forge/core`   | JS  | `route()` 核心实现 + 类型定义 + HTTP 层 |
+| `@route-forge/vue`    | JS  | Vue 3 插件、组合式 API、请求门闩        |
 
 route-forge 解决的核心问题： **让 Laravel 的命名路由在前端也能被类型安全地消费**。后端写
-`Route::name('admin.users.edit')`，前端就能用 `route('admin.users.edit', { id: 3 })` ——
-参数缺了、名字拼错了，TypeScript / 运行时都会及时报错。
+`Route::name('api.catalogs.show')`，前端就能用 `route('api.catalogs.show', { slug })` ——
+参数缺了、名字拼错了，TypeScript / 运行时都会及时报错，拒绝静默 404。
 
-本项目把这套链路从「路由定义」→「forge 上下文生成」→「Blade 注入」→「Vue 插件消费」→「TypeScript
-类型下发」完整走通，同时用一份真正可浏览的企业画册作为展示载体，让你既能看到代码，也能看到最终效果。
+## 整体架构
 
-## 项目亮点
+**前后端分离**：Laravel 不再为每个栏目渲染页面，只负责两件事 —— 输出一个唯一的 Blade 壳页和一套 JSON
+API；页面路由全部由前端 vue-router 接管。
 
-| # | 亮点                        | 说明                                                                                                                                                        |
-|---|-----------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1 | **route-forge 全链路**      | 后端 `route-forge/laravel` + 前端 `@route-forge/vue` + `@route-forge/core`，Blade 指令 `@forgeSummary` 注入上下文，Vue 插件 `createRouteForgePlugin()` 消费 |
-| 2 | **类型安全的命名路由**      | 前端调用 `route('admin.users.edit', { id: 3 })`，参数缺省 / 名称拼写错误即时报错                                                                            |
-| 3 | **Vue 3 + UnoCSS + Pug**    | 模板缩进语法、原子化 CSS、Element Plus 按需引入，是现代化前端基座的标杆组合                                                                                 |
-| 4 | **Element Plus 按需引入**   | `unplugin-vue-components` + `ElementPlusResolver`，组件、指令、函数式 API 零 import，产物 tree-shake                                                        |
-| 5 | **Blade 模板也扫 UnoCSS**   | `uno.config.js` 的 `content.filesystem` 覆盖 `resources/views/**/*.blade.php`，原子类跨层复用                                                               |
-| 6 | **Composer & NPM 一键安装** | `composer setup` 走完 PHP 依赖 + key + migrate + 前端 build                                                                                                 |
+```
+浏览器 ── 任意 URL ──▶ Laravel
+                        │  唯一 Blade 壳 resources/views/index.blade.php
+                        │  <head> 里 @forgeSummary 注入 window.__ROUTE_FORGE__
+                        ▼
+                   Vue 3 SPA（Vite 构建，vue-router history 模式）
+                        │  页面切换全在前端完成，不再回源
+                        │
+                        │  useForgeApi('public')   ← 公开数据，摘要已预加载
+                        │  useForgeApi('manage')   ← 登录后懒加载的管理端接口
+                        ▼
+                   Laravel JSON API
+                        ├── /api/*          level: public（eager）
+                        └── /manage/api/*   level: manage（lazy，需登录）
+```
+
+route-forge 在其中的角色：
+
+- **后端**把命名路由按 **层级（level）** 归类：公开接口归 `public`（eager，随首屏注入）， 管理接口归
+  `manage`（lazy，登录后才按需拉取明细，且明细端点本身受中间件保护）
+- **前端**凭路由名生成 URL（`route()`）、凭层级发请求（`useForgeApi(level)`），全程不硬编码一个 URL
+
+## 功能规划
+
+### 前台（公开访问，3 页）
+
+| 页面     | 说明                                       |
+|----------|--------------------------------------------|
+| 首页     | 品牌展示 + 精选画册入口                    |
+| 画册列表 | 按分类浏览画册，卡片式入口                 |
+| 画册详情 | 翻页式阅读（PageFlip），逐页展示画册页数据 |
+
+### 管理端（登录后访问，4 块）
+
+| 模块       | 说明                                     |
+|------------|------------------------------------------|
+| 基础资料   | 站点名称、品牌信息、联系方式等站点级配置 |
+| 分类       | 画册分类的增删改查与排序                 |
+| 画册列表   | 画册的增删改查、发布状态、归属分类       |
+| 画册页数据 | 单本画册内页的增删改查与排序             |
 
 ## 快速开始
 
@@ -59,7 +97,7 @@ route-forge 解决的核心问题： **让 Laravel 的命名路由在前端也�
 | PHP        | 8.5+     |
 | Composer   | 2.x      |
 | Node.js    | 20+      |
-| NPM / PNPM | 任意     |
+| pnpm / npm | 任意     |
 
 ### 一键安装
 
@@ -72,12 +110,12 @@ composer setup
 1. `composer install` — PHP 依赖（含 `route-forge/laravel`）
 2. 复制 `.env`、生成 `APP_KEY`
 3. `php artisan migrate --force` — SQLite 默认数据库
-4. `npm install --ignore-scripts` + `npm run build` — 前端构建（含 `@route-forge/vue`）
+4. `npm install --ignore-scripts` + `npm run build` — 前端构建
 
 ### 本地开发
 
 ```bash
-# 后端 + Vite 双进程（laravel/pail）
+# 后端 + Vite 双进程
 composer dev
 
 # 或分开跑
@@ -95,99 +133,83 @@ composer test
 
 ### 后端
 
-| 组件                    | 版本     | 职责                                     |
-|-------------------------|----------|------------------------------------------|
-| PHP                     | ^8.5     | 运行时                                   |
-| Laravel                 | ^13.17   | Web 框架                                 |
-| **route-forge/laravel** | **^1.4** | **命名路由 → forge 上下文 → Blade 指令** |
-| laravel/tinker          | ^3.0     | REPL                                     |
-| PHPUnit                 | ^12.5    | 测试框架                                 |
+| 组件                    | 版本     | 职责                                          |
+|-------------------------|----------|-----------------------------------------------|
+| PHP                     | ^8.5     | 运行时                                        |
+| Laravel                 | ^13.17   | Web 框架（JSON API + 唯一 Blade 壳）          |
+| **route-forge/laravel** | **^1.4** | **层级路由 → forge 摘要 → Blade 指令 → 类型** |
+| PHPUnit                 | ^12.5    | 测试框架                                      |
 
 ### 前端
 
-| 组件                    | 版本     | 职责                            |
-|-------------------------|----------|---------------------------------|
-| Vue                     | ^3.5     | UI 框架                         |
-| **@route-forge/core**   | **^2.2** | **route() 核心实现 + 类型定义** |
-| **@route-forge/vue**    | **^2.2** | **Vue 插件 + 组合式 API**       |
-| Vite                    | ^8.2     | 构建工具                        |
-| UnoCSS                  | ^66.9    | 原子化 CSS（含 `presetUno`）    |
-| Pug                     | ^3.0     | 模板缩进语法                    |
-| Element Plus            | ^2.14    | UI 组件库（按需引入）           |
-| @element-plus/icons-vue | ^2.3     | 图标库（显式引入）              |
-
-## 项目结构
-
-```
-route-forge-laravel-example/
-├── app/                          # Laravel 应用
-│   ├── Http/Controllers/         # 控制器（后续接入 route-forge 命名路由）
-│   ├── Models/                   # Eloquent 模型
-│   └── Providers/                # 服务提供者
-├── resources/
-│   ├── views/                    # Blade 模板（含 @forgeSummary 指令）
-│   │   ├── layout.blade.php      # 全站布局，注入 forge 上下文
-│   │   └── home.blade.php        # 企业画册首页入口
-│   ├── js/
-│   │   ├── app.js                # Vue 入口，挂载 createRouteForgePlugin
-│   │   ├── App.vue               # 根组件（Pug 模板）
-│   │   └── components/           # 自动注册的业务组件
-│   └── css/app.css               # 前端样式入口
-├── routes/                       # Laravel 路由定义（即将接入 route-forge 命名）
-├── config/                       # Laravel 配置
-├── .docs/                        # 📖 完整文档（见下方「文档导航」）
-├── composer.json                 # PHP 依赖（含 route-forge/laravel）
-├── package.json                  # 前端依赖（含 @route-forge/vue, @route-forge/core）
-├── vite.config.js                # Vite 插件链（含 UnoCSS / Vue / AutoImport / Components）
-└── README.md
-```
+| 组件                    | 版本     | 职责                                |
+|-------------------------|----------|-------------------------------------|
+| Vue                     | ^3.5     | UI 框架                             |
+| **@route-forge/core**   | **^2.2** | **route() 核心 + HTTP 适配 + 类型** |
+| **@route-forge/vue**    | **^2.2** | **Vue 插件 + useForgeApi 组合式**   |
+| vue-router              | ^4       | SPA 页面路由（history 模式）        |
+| Vite                    | ^8.2     | 构建工具                            |
+| UnoCSS                  | ^66.9    | 原子化 CSS（`presetUno`）           |
+| Pug                     | ^3.0     | 模板缩进语法                        |
+| Element Plus            | ^2.14    | UI 组件库（按需引入）               |
+| @element-plus/icons-vue | ^2.3     | 图标库（显式引入）                  |
 
 ## route-forge 在本项目中的用法
 
-这是你打开这个仓库最该关注的部分 —— 三行代码看懂整条链路。
+三步看懂整条链路：
 
-### 1. 后端：Blade 指令注入 forge 上下文
+### 1. 后端：Blade 壳注入 forge 摘要
 
-`resources/views/layout.blade.php:42`
+`resources/views/index.blade.php`（放在 `<head>`，必须早于前端 bundle 求值）：
 
 ```blade
 @forgeSummary
 ```
 
-这一行由 `route-forge/laravel` 包注册的 Blade 指令展开，把 Laravel 路由表中所有命名路由的元信息（URI、HTTP
-方法、参数签名）序列化成 JSON，注入到 HTML 中供前端消费。
+这行指令注入一段一次性访问器脚本：前端第一次读 `window.__ROUTE_FORGE__` 即取到 forge 摘要 （各层级路由的
+URI、方法、参数签名），读取后自动删除，不留全局残留。
 
-### 2. 前端：Vue 插件初始化
+### 2. 前端：Vue 插件初始化 + vue-router 接管页面
 
-`resources/js/app.js:16-28`
+`resources/js/app.js`：
 
 ```js
-import { createRouteForgePlugin } from '@route-forge/vue';
+import forge from './forge.js';
+import router from './route.js';
 
 const app = createApp(App);
-const forge = createRouteForgePlugin({});
 app.use(forge);
-forge.ready().then(() => app.mount('#app'));
+app.use(router);
+forge.ready().then(() => app.mount('#app'));   // 摘要解析完成才挂载
 ```
 
-`createRouteForgePlugin` 会在 `ready()` 阶段解析 `@forgeSummary` 注入的 JSON，构建前端路由表。之后在任何组件里都可以安全调用
-`route('name', params)`。
+之后在组件里：
 
-### 3. 后续：命名路由定义（即将接入）
+```vue
+<script setup>
+const { route } = useForgeRoute();
+const { call } = useForgeApi('public');
 
-`routes/web.php`（待落地）
+// 用路由名跳转（vue-router 只管组件映射，URL 生成归 route-forge）
+router.push(route('api.catalogs.show', { slug: 'company-2026' }));
 
-```php
-Route::name('home')->get('/', [HomeController::class, 'index']);
-Route::name('admin.users.index')->get('/admin/users', [UserController::class, 'index']);
-Route::name('admin.users.edit')->get('/admin/users/{user}', [UserController::class, 'edit']);
+// 用层级发请求（useForgeApi 内部按路由名构造 API 调用）
+const res = await call('api.catalogs.index');
+</script>
 ```
 
-命名 → 自动出现在 forge 上下文 → 前端 `route('admin.users.edit', { user: 3 })` 可直接用 → 类型同步下发到
-`resources/js/types/forge.d.ts`。
+### 3. 后端：类型下发
 
-> 💡 这三步目前第 1、2 步已在仓库中就绪，第 3 步「命名路由 +
-> 类型下发」是下一轮的落地目标。详见 [Roadmap](#roadmap)。
+路由变更后重新生成前端类型：
+
+```bash
+php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
+```
+
+`route()` 的路由名与参数从此被 TS 约束：名字拼错、参数漏传，编译期即报错。
+
+> 详细用法见 [02 · 后端接入](.docs/02-backend-integration.md) 与
+> [03 · 前端接入](.docs/03-frontend-integration.md)。
 
 ## 文档导航
 
@@ -195,24 +217,23 @@ Route::name('admin.users.edit')->get('/admin/users/{user}', [UserController::cla
 
 | 序号 | 文档                                                                    | 适合谁      | 内容                                                               |
 |------|-------------------------------------------------------------------------|-------------|--------------------------------------------------------------------|
-| 01   | [架构总览](.docs/01-architecture.md)                                    | 所有人      | route-forge 三包协作模型、请求链路图、本项目集成全景               |
-| 02   | [后端接入：route-forge/laravel](.docs/02-backend-integration.md)        | PHP 开发者  | 安装、命名路由定义、`@forgeSummary` 指令、forge 上下文结构         |
-| 03   | [前端接入：@route-forge/vue](.docs/03-frontend-integration.md)          | 前端开发者  | Vue 插件初始化、`route()` 组合式 API、类型推断、错误处理           |
-| 04   | [企业画册：栏目结构与内容模型](.docs/04-catalog-structure.md)           | 产品 / 全栈 | 画册栏目划分、路由表设计、前后端字段约定                           |
-| 05   | [前端工程化：UnoCSS + Pug + Element Plus](.docs/05-frontend-tooling.md) | 前端开发者  | Vite 插件链详解、按需引入配置、Blade 与 Vue 的样式边界             |
+| 01   | [架构总览](.docs/01-architecture.md)                                    | 所有人      | 三包协作模型、前后端分离链路图、层级（levels）设计                 |
+| 02   | [后端接入：route-forge/laravel](.docs/02-backend-integration.md)        | PHP 开发者  | levels 配置、tier 归级、`@forgeSummary`、端点体系、类型生成        |
+| 03   | [前端接入：@route-forge/vue](.docs/03-frontend-integration.md)          | 前端开发者  | 插件初始化、vue-router 集成、`useForgeApi`、懒加载层级、错误处理   |
+| 04   | [企业画册：栏目结构与内容模型](.docs/04-catalog-structure.md)           | 产品 / 全栈 | 前台三页 + 管理端四块、路由表规划、数据模型、字段契约              |
+| 05   | [前端工程化：UnoCSS + Pug + Element Plus](.docs/05-frontend-tooling.md) | 前端开发者  | Vite 插件链、按需引入、Pug 约定、样式分层                          |
 | 06   | [开发指南](.docs/06-development.md)                                     | 贡献者      | 本地环境、代码规范、调试技巧、常见坑                               |
-| 07   | [FAQ](.docs/07-faq.md)                                                  | 所有人      | 类型不更新怎么办？Blade 里能用 route() 吗？如何在 API 路由上使用？ |
+| 07   | [FAQ](.docs/07-faq.md)                                                  | 所有人      | 懒加载、类型不更新、别名、与 Laravel 原生 route() 的关系、故障排查 |
 
 ## Roadmap
 
-| 阶段                  | 状态      | 交付物                                                                                            |
-|-----------------------|-----------|---------------------------------------------------------------------------------------------------|
-| **P0 · 前端基座**     | ✅ 完成   | Vue 3 + UnoCSS + Pug + Element Plus 按需引入 + `@forgeSummary` + `createRouteForgePlugin`         |
-| **P1 · 命名路由落地** | 🔨 进行中 | `routes/web.php` 定义画册栏目路由、forge 上下文完整生成、`resources/js/types/forge.d.ts` 自动产出 |
-| **P2 · 画册内容模型** | 📋 待开始 | Eloquent 模型 + Seeder + 后台管理（或静态数据），前后端字段契约                                   |
-| **P3 · Vue 页面组件** | 📋 待开始 | 首页 Hero、栏目列表、详情页、联系我们，全部用 `route()` 做导航                                    |
-| **P4 · 测试覆盖**     | 📋 待开始 | 路由测试、控制器测试、前端单元测试                                                                |
+| 阶段                    | 内容                                                                    |
+|-------------------------|-------------------------------------------------------------------------|
+| **P1 · 前后端分离基座** | 唯一 Blade 壳 + vue-router SPA + forge 双层级（public / manage）        |
+| **P2 · 公开 API**       | 画册列表 / 画册详情 / 站点基础资料，前台三页消费                        |
+| **P3 · 管理端**         | 登录 + 基础资料 / 分类 / 画册列表 / 画册页数据四模块，manage 层级懒加载 |
+| **P4 · 类型与测试**     | `route:forge:types` 接入工作流，路由 / API / 权限测试覆盖               |
 
 ## License
 
-MIT © route-forge 
+MIT © route-forge

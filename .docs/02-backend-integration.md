@@ -1,26 +1,24 @@
 # 02 · 后端接入：route-forge/laravel
 
-> 读完本文你会知道：如何安装 `route-forge/laravel`、如何定义命名路由、`@forgeSummary`
-> 指令到底注入了什么、以及如何生成类型文件。
->
-> ⚠️ **本文的后端内容与 Vue 版完全一致** —— `route-forge/laravel` 是框架无关的后端包，
-> 只负责生成 forge 上下文 JSON，不关心前端是 Vue、React 还是原生 JS。
+> 读完本文你会知道：`route-forge/laravel` 如何安装与配置、路由怎么归入层级、`@forgeSummary`
+> 注入的是什么、端点体系怎么工作、以及如何生成前端类型文件。所有 API 均以 1.4 版真实行为为准。
 
 ---
 
 ## 目录
 
-- [安装](#安装)
-- [定义命名路由](#定义命名路由)
+- [安装与配置](#安装与配置)
+- [层级（levels）配置](#层级levels配置)
+- [路由归级的三条通道](#路由归级的三条通道)
+- [本项目路由规划](#本项目路由规划)
 - [@forgeSummary 指令](#forgesummary-指令)
-- [forge 上下文结构](#forge-上下文结构)
+- [端点体系](#端点体系)
 - [生成 TypeScript 类型](#生成-typescript-类型)
-- [路由缓存注意事项](#路由缓存注意事项)
-- [常见问题](#常见问题)
+- [strict_mode 与其他配置](#strict_mode-与其他配置)
 
 ---
 
-## 安装
+## 安装与配置
 
 `route-forge/laravel` 已在 `composer.json` 中声明：
 
@@ -32,325 +30,203 @@
 }
 ```
 
-首次安装：
-
 ```bash
 composer require route-forge/laravel
 ```
 
-Laravel 11+ 的 Package Discovery 会自动注册服务提供者，无需手动配置。
-
-### 发布配置（可选）
+Laravel 11+ 的 Package Discovery 自动注册服务提供者。配置文件发布到宿主项目后就是
+`config/forge.php`（本仓库已含一份带完整注释的配置）：
 
 ```bash
-php artisan vendor:publish --tag=route-forge-config
+php artisan vendor:publish --tag=forge-config
 ```
 
-会生成 `config/route-forge.php`，可配置：
+## 层级（levels）配置
+
+route-forge 不预设固定层级，层级完全由 `config/forge.php` 的 `levels` 键自定义。本项目的规划：
 
 ```php
-return [
-    'inject_route_summary' => true,        // 是否自动注入 @forgeSummary
-    'summary_variable_name' => '__FORGE__', // 前端读取的全局变量名
-    'include_api_routes' => true,           // 是否包含 routes/api.php 的路由
-    'exclude_patterns' => [                 // 要排除的路由名称 pattern
-        'debugbar.*',
-        'telescope.*',
+'levels' => [
+    // 前台：公开数据接口，浏览器首屏就要用 → eager
+    'public' => [
+        'description' => '企业画册前台公开数据接口（无需登录）',
+        'match' => [
+            'prefix'     => ['api'],      // URI 以 /api 开头即命中
+            'middleware' => [],
+        ],
+        'load' => 'eager',
     ],
-];
+
+    // 管理端：基础资料/分类/画册/画册页的维护接口 → lazy + 受保护
+    'manage' => [
+        'description' => '企业管理端接口（需登录）',
+        'match' => [
+            'prefix'     => ['manage'],   // 与 middleware 是 OR 关系，命中任一即归级
+            'middleware' => ['manage'],
+        ],
+        'load' => 'lazy',
+        'endpoint_middleware' => ['manage'],   // 层级明细端点本身也要登录
+    ],
+],
 ```
 
-## 定义命名路由
+| 字段                     | 说明                                                    |
+|--------------------------|---------------------------------------------------------|
+| `description`            | 层级描述，仅用于文档与调试输出                          |
+| `match.prefix`           | URI 前缀匹配列表，命中任一即归入此层级                  |
+| `match.middleware`       | 中间件匹配列表，与 prefix 是 **OR** 关系                |
+| `match.middleware_match` | 中间件匹配模式：`'any'`（OR）/ `'all'`（AND）/ DNF 数组 |
+| `load`                   | `eager` = 随摘要注入首屏；`lazy` = 前端登录后按需拉取   |
+| `endpoint_middleware`    | 访问该层级明细端点要求的中间件；未配置则不限制          |
 
-route-forge 的一切都始于 **命名路由**。没有名字的路由不会出现在 forge 上下文中。
+## 路由归级的三条通道
 
-### 基本写法
+优先级从高到低：
+
+### ① 显式 tier（宏，最高优先级）
+
+`->tier()` 是注册在 `Illuminate\Routing\Route` 上的宏， **必须后置链式**：
 
 ```php
-// routes/web.php
+// ✅ 正确：先定义路由，再链式归级
+Route::post('/login', [AuthController::class, 'store'])->name('login')->tier('public');
 
-use Illuminate\Support\Facades\Route;
-
-// 单路由命名
-Route::name('home')->get('/', [HomeController::class, 'index']);
-
-// 分组前缀命名（推荐）
-Route::name('about.')->group(function () {
-    Route::get('/about', [AboutController::class, 'index']);      // → about.index
-    Route::get('/about/team', [AboutController::class, 'team']);  // → about.team
-});
-
-// resource 路由自动命名
-Route::resource('products', ProductController::class);
-// → products.index, products.create, products.store, products.show,
-//   products.edit, products.update, products.destroy
+// ❌ 错误：写成 Route::tier('public')->post(...)
+//    会先进 RouteRegistrar，tier 连同名称前缀一起被丢弃并抛异常
 ```
 
-### 参数签名
-
-路由参数会被自动解析并出现在 forge 上下文的 `params` 字段中：
+组级归级：
 
 ```php
-Route::name('admin.users.edit')->get('/admin/users/{user}', ...);
-// params: [{ name: 'user', required: true, type: 'int|string' }]
-
-Route::name('blog.posts.show')->get('/blog/{category?}/{slug}', ...);
-// params: [
-//   { name: 'category', required: false, type: 'string' },
-//   { name: 'slug', required: true, type: 'string' }
-// ]
+Route::group(['tier' => 'public'], function () {
+    // 组内所有路由归 public
+});
 ```
 
-### 本项目的画册路由规划
+典型用途：把「不符合任何 match 规则」的个别路由单独捞出来。例如管理端的登录/登出接口虽然 URI 在
+`/manage` 下，但登录页要在未登录时可用，就得显式 `->tier('public')`。
 
-这是本项目 P1 阶段要落地的路由表设计，供你参考命名风格：
+### ② classifier 回调
+
+`config/forge.php` 的 `classifier`，签名 `fn(Route $r): ?string`，按任意逻辑返回层级名：
 
 ```php
-// routes/web.php
-
-// 品牌首页
-Route::name('home')->get('/', ...);
-
-// 画册主栏目
-Route::name('catalog.')->group(function () {
-    Route::name('index')->get('/catalog', ...);                    // 画册列表
-    Route::name('show')->get('/catalog/{slug}', ...);              // 画册详情
-});
-
-// 关于我们
-Route::name('about.')->group(function () {
-    Route::name('company')->get('/about', ...);                    // 公司简介
-    Route::name('team')->get('/about/team', ...);                  // 团队
-    Route::name('contact')->get('/contact', ...);                  // 联系方式
-});
-
-// 产品展示
-Route::name('products.')->group(function () {
-    Route::name('index')->get('/products', ...);                   // 产品列表
-    Route::name('category')->get('/products/{category}', ...);     // 分类筛选
-    Route::name('show')->get('/products/{category}/{slug}', ...);  // 产品详情
-});
+'classifier' => fn (\Illuminate\Routing\Route $r): ?string =>
+    str_contains($r->getAction()['controller'] ?? '', 'Admin\\') ? 'manage' : null,
 ```
+
+### ③ match 规则（prefix / middleware）
+
+见上文 levels 配置。适合成批路由（如 `/api` 前缀整批归 public）。
+
+> ⚠️ 本项目开启 `strict_mode`：三条通道都没命中的路由直接抛
+> `RouteTierNotAssignedException`（500）。宁可 fails-fast，也不要静默掉进 `unassigned`。
+
+## 本项目路由规划
+
+前后端分离下，后端只出 JSON API。路由分两组：
+
+### 公开数据接口（routes/api.php，level: public）
+
+| 路由名                 | 方法 | URI                    | 说明                     |
+|------------------------|------|------------------------|--------------------------|
+| `api.site.show`        | GET  | `/api/site`            | 站点基础资料             |
+| `api.categories.index` | GET  | `/api/categories`      | 分类列表                 |
+| `api.catalogs.index`   | GET  | `/api/catalogs`        | 画册列表（可按分类筛选） |
+| `api.catalogs.show`    | GET  | `/api/catalogs/{slug}` | 画册详情（含全部页数据） |
+
+### 管理端接口（routes/manage.php，level: manage，prefix `/manage`）
+
+| 路由名                                                | 方法       | URI                                            | 说明                      |
+|-------------------------------------------------------|------------|------------------------------------------------|---------------------------|
+| `manage.login` / `manage.logout`                      | POST       | `/manage/login` / `/manage/logout`             | 登录登出（显式归 public） |
+| `manage.api.site.update`                              | PUT        | `/manage/api/site`                             | 基础资料维护              |
+| `manage.api.categories.*`                             | CRUD       | `/manage/api/categories`                       | 分类管理                  |
+| `manage.api.catalogs.index/store/show/update/destroy` | CRUD       | `/manage/api/catalogs`                         | 画册管理                  |
+| `manage.api.catalogs.pages.index/store`               | GET/POST   | `/manage/api/catalogs/{catalog}/pages`         | 画册页列表/新增           |
+| `manage.api.catalogs.pages.reorder`                   | POST       | `/manage/api/catalogs/{catalog}/pages/reorder` | 页排序                    |
+| `manage.api.pages.update/destroy`                     | PUT/DELETE | `/manage/api/pages/{page}`                     | 页编辑/删除               |
+
+命名规范：`{scope}.{resource}.{action}`，点分隔、全小写。forge 摘要会收录全部命名路由并按 层级归类，前端凭名字调用。
 
 ## @forgeSummary 指令
 
-在 Blade 布局中放一行：
+前后端分离下，Blade 只剩一个壳页 `resources/views/index.blade.php`。指令放在 **`<head>` 里、
+`@vite` 之前**：
 
 ```blade
-{{-- resources/views/layout.blade.php --}}
-@forgeSummary
+<head>
+  ...
+  @forgeSummary
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
+</head>
 ```
 
-这行指令在 Blade 编译时被展开，最终注入到 HTML 中的内容大致是：
+注入的不是完整 JSON，而是一段 **一次性访问器脚本**：用 `defineProperty` 定义
+`window.__ROUTE_FORGE__`，前端第一次读取即返回 forge 摘要并自动删除属性 —— 不留全局残留， 也避免后续脚本误改。
 
-```html
-<script>
-window.__FORGE__ = {
-  routes: {
-    "home": {
-      uri: "/",
-      methods: ["GET"],
-      params: []
-    },
-    "admin.users.edit": {
-      uri: "/admin/users/{user}",
-      methods: ["GET"],
-      params: [{ name: "user", required: true }]
-    },
-    // ... 所有命名路由
-  },
-  version: "1.4.0"
-};
-</script>
-```
+> ⚠️ 顺序契约：`@forgeSummary` 必须早于前端 bundle 求值。放 `<head>` 且 `@vite` 里的 app.js
+> 是 `type=module`（defer 语义），顺序天然成立；若改成非 defer 的普通脚本，会静默失效。
 
-### 放置位置
+## 端点体系
 
-**必须在前端 main.tsx 加载之前**。本项目放在 `</body>` 之前（Blade 中 `@forgeSummary` 之后紧接 `@vite` 的脚本）：
+Blade 注入之外的 HTTP 通道，前缀默认 `/_forge/routes`（`FORGE_ENDPOINT_PREFIX` 可覆盖）：
 
-```blade
-<body>
-  <div id="root"></div>
-  @forgeSummary          {{-- 注入 JSON --}}
-  @vite(['resources/css/app.css', 'resources/js/main.tsx'])  {{-- 然后才加载 JS --}}
-</body>
-```
+| 端点                            | 说明                                                                    |
+|---------------------------------|-------------------------------------------------------------------------|
+| `GET /_forge/routes`            | 摘要端点：全部 eager 层级 + 各层级状态                                  |
+| `GET /_forge/routes/{level}`    | 层级明细端点：该层级全部路由元信息；受该层级 `endpoint_middleware` 保护 |
+| `GET /_forge/routes/unassigned` | 仅 `strict_mode=false` 时存在，收容未归级路由                           |
 
-> ⚠️ 如果你把 `@forgeSummary` 放在 `<head>` 里或 JS 加载之后，React 的 `RouteForgeProvider` 会因为读不到 `window.__FORGE__` 而初始化失败。
+懒加载层级（本项目 `manage`）正是靠明细端点工作：前端登录后首次调用 `useForgeApi({ level: 'manage' })`
+时自动请求 `GET /_forge/routes/manage`，拿到路由明细后构建管理端路由表。
 
-### 自定义变量名
-
-如果 `window.__FORGE__` 这个名字和你现有代码冲突，在 `config/route-forge.php` 中修改：
-
-```php
-'summary_variable_name' => '__MY_ROUTES__',
-```
-
-前端对应要在 `<RouteForgeProvider>` 里传同样的名字（见 [03 · 前端接入](03-frontend-integration.md)）。
-
-## forge 上下文结构
-
-完整的 forge 上下文 JSON 结构：
-
-```json
-{
-  "routes": {
-    "home": {
-      "uri": "/",
-      "methods": ["GET", "HEAD"],
-      "params": []
-    },
-    "admin.users.edit": {
-      "uri": "/admin/users/{user}",
-      "methods": ["GET", "HEAD"],
-      "params": [
-        {
-          "name": "user",
-          "required": true,
-          "type": "int|string",
-          "pattern": null
-        }
-      ]
-    },
-    "blog.posts.show": {
-      "uri": "/blog/{category?}/{slug}",
-      "methods": ["GET", "HEAD"],
-      "params": [
-        {
-          "name": "category",
-          "required": false,
-          "type": "string",
-          "pattern": null
-        },
-        {
-          "name": "slug",
-          "required": true,
-          "type": "string",
-          "pattern": "[a-z0-9-]+"
-        }
-      ]
-    }
-  },
-  "baseUrl": "https://example.com",
-  "version": "1.4.0",
-  "generatedAt": "2026-09-03T10:00:00Z"
-}
-```
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `routes` | `Record<string, ForgeRoute>` | 以路由名为 key 的路由表 |
-| `routes[name].uri` | `string` | Laravel 风格的 URI 模板，含 `{param}` 和 `{param?}` |
-| `routes[name].methods` | `string[]` | 该路由响应的 HTTP 方法 |
-| `routes[name].params` | `ForgeParam[]` | 参数签名列表 |
-| `routes[name].params[].name` | `string` | 参数名（不含 `{}`） |
-| `routes[name].params[].required` | `boolean` | 是否必填 |
-| `routes[name].params[].type` | `string` | Laravel 推断的类型提示 |
-| `routes[name].params[].pattern` | `string \| null` | `->where('param', 'pattern')` 定义的正则约束 |
-| `baseUrl` | `string` | 应用的 APP_URL，用于生成绝对 URL |
-| `version` | `string` | route-forge/laravel 版本 |
-| `generatedAt` | `string` | ISO 8601 生成时间 |
+另有一个调试用的 **管理器页面** `/_forge/manager*`，仅在 `APP_DEBUG=true` 时注册，并有
+`manager_allowed_ips` IP 白名单（默认仅本机）—— 生产环境双保险下不可见。
 
 ## 生成 TypeScript 类型
 
-`route-forge/laravel` 提供了 Artisan 命令，把 forge 上下文直接写成 `.d.ts` 文件：
-
 ```bash
-php artisan forge:types resources/js/types/forge.d.ts
+php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
 ```
 
-生成的文件大致长这样：
+| 选项       | 说明                                  |
+|------------|---------------------------------------|
+| `--out=`   | 写入指定文件路径；不传则输出到 stdout |
+| `--level=` | 仅生成指定层级下的路由类型            |
+| `--json`   | 输出 JSON 对象格式（键为路由名）      |
+
+生成的类型让前端 `route()` 的路由名与参数被 TS 约束：
 
 ```typescript
-// resources/js/types/forge.d.ts
 // AUTO-GENERATED — DO NOT EDIT MANUALLY
-
-export interface ForgeRouteParams {
-  home: {};
-  "admin.users.edit": { user: number | string };
-  "blog.posts.show": { category?: string; slug: string };
-  "products.show": { category: string; slug: string };
-}
-
-export type ForgeRouteName = keyof ForgeRouteParams;
+route('api.catalogs.show', { slug: 'company-2026' });  // ✅
+route('api.catalogs.show', {});                        // ❌ 缺 slug，编译报错
+route('api.catalog.show', { slug });                   // ❌ 名字拼错，编译报错
 ```
 
-之后在 React 组件里调用 `useRouteForge().route()` 时，TypeScript 就会根据路由名自动提示需要哪些参数：
-
-```typescript
-// ✅ 正确：参数完整
-route("admin.users.edit", { user: 3 });
-
-// ❌ 错误：缺少必填参数 slug —— TS 立即报错
-route("blog.posts.show", { category: "tech" });
-```
-
-### 建议集成到开发流程
-
-在 `composer.json` 的 scripts 里加一个钩子：
-
-```json
-{
-  "scripts": {
-    "forge": "@php artisan forge:types resources/js/types/forge.d.ts"
-  }
-}
-```
-
-以后改完路由跑一下：
+配套命令：
 
 ```bash
-composer forge
+php artisan route:forge:list              # 路由清单（含层级、Alias Of 列，--aliases 过滤）
+php artisan route:forge:clear             # 清空 forge 缓存
 ```
 
-## 路由缓存注意事项
+## strict_mode 与其他配置
 
-如果你的生产环境使用了 `php artisan route:cache`，需要知道：
+`config/forge.php` 其余关键项：
 
-| 场景 | forge 上下文是否正确 |
-|------|---------------------|
-| `php artisan route:cache` 之后访问页面 | ✅ 正确（从缓存的路由表生成） |
-| 新增路由但忘了重新 cache | ❌ 缺失新路由 |
-| `php artisan route:clear` 之后访问页面 | ✅ 正确（从实时路由表生成） |
+| 配置                  | 本项目取值 | 说明                                                                  |
+|-----------------------|------------|-----------------------------------------------------------------------|
+| `strict_mode`         | `true`     | 未归级路由抛异常（见上文）                                            |
+| `endpoint_prefix`     | 默认       | `/_forge/routes`，可用 `FORGE_ENDPOINT_PREFIX` 覆盖                   |
+| `cache_ttl`           | 3600       | 端点缓存秒数；`null` 不缓存，`0` 永久缓存                             |
+| `aliases`             | `[]`       | 路由别名映射（旧名 → 新名），也可用宏 `->forgeAlias('旧名')` 显式声明 |
+| `scheme_version`      | 1          | 摘要响应格式版本，前端据此做版本兼容                                  |
+| `manager_allowed_ips` | 仅本机     | 管理器页面 IP 白名单（仅 APP_DEBUG 下有意义）                         |
 
-**建议**：在部署脚本里，把 `forge:types` 放在 `route:cache` 之后执行。
-
-## 常见问题
-
-### Q: 我用了 route 分组前缀，子路由的名字是什么？
-
-Laravel 的 `Route::name('prefix.')` 会给组内所有路由加上前缀，注意末尾的 `.`：
-
-```php
-Route::name('admin.')->group(function () {
-    Route::get('/users', ...);  // 名为 admin.users
-    Route::get('/roles', ...);  // 名为 admin.roles
-});
-```
-
-### Q: 我不想某些调试路由出现在 forge 上下文里？
-
-在 `config/route-forge.php` 配置 `exclude_patterns`：
-
-```php
-'exclude_patterns' => ['debugbar.*', 'telescope.*', 'horizon.*'],
-```
-
-支持通配符 `*` 匹配任意子路由。
-
-### Q: API 路由也能被前端消费吗？
-
-可以。在 `config/route-forge.php` 中：
-
-```php
-'include_api_routes' => true,
-```
-
-API 路由的 URI 会带上 `/api` 前缀，前端 `route('api.v1.users', ...)` 就能生成 `/api/v1/users`。
-
-### Q: forge 上下文会暴露敏感路由吗？
-
-会。**不要把带后台权限控制的路由名暴露在 forge 上下文里**。用 `exclude_patterns` 排除管理后台路由，或者只在有对应权限的页面里渲染 `@forgeSummary`（可以用 Blade 的 `@can` 包裹）。
+别名是路由改名的过渡手段：旧名与真实路由指向完全相同的元信息，类型文件也会为别名生成条目。
+改名稳定后应及时清理，避免两套名字长期并存。
 
 ---
 

@@ -1,6 +1,7 @@
 # 07 · FAQ
 
-> 收集 route-forge 使用过程中最常被问到的问题，按后端 / 前端 / 通用分类。
+> 收集 route-forge 使用过程中最常被问到的问题，按后端 / 前端 / 通用分类。所有答案以
+> route-forge/laravel 1.4 与 @route-forge/* 2.2 的真实行为为准。
 
 ---
 
@@ -17,294 +18,217 @@
 
 ### Q: route-forge/laravel 和 Laravel 原生的 `route()` 辅助函数是什么关系？
 
-完全无关。Laravel 的 PHP 侧 `route('name', ['param' => 'value'])` 在 Blade 或 Controller 中生成 URL；route-forge/laravel 把路由表元信息导出成 JSON 给前端 JS 消费。两者用同一套命名路由做数据源，但独立运行。
+完全无关。Laravel 的 PHP 侧 `route('name', ['param' => 'value'])` 在 Blade 或 Controller 中生成
+URL；route-forge/laravel 把路由表元信息按层级导出给前端 JS 消费。两者用同一套命名路由做数据源， 但独立运行。
 
 ```blade
-{{-- Blade 里用 Laravel 原生的（PHP 侧） --}}
-<a href="{{ route('catalog.show', ['slug' => 'hello']) }}">链接</a>
+{{-- Blade 壳里用 Laravel 原生的（PHP 侧）--}}
+<a href="{{ route('home') }}">首页</a>
 ```
 
-```tsx
-// React 里用 route-forge 的（JS 侧）
-import { useRouteForge } from '@route-forge/react';
-
-function Link() {
-  const { route } = useRouteForge();
-  return <a href={route('catalog.show', { slug: 'hello' })}>链接</a>;
-}
+```jsx
+{/* React 里用 route-forge 的（JS 侧）*/}
+<ForgeLink level="public" name="api.catalogs.show" params={{ slug }} as={Link}>
+  画册详情
+</ForgeLink>
 ```
 
-### Q: 没有命名的路由会被纳入 forge 上下文吗？
+### Q: 没有命名的路由会被纳入 forge 摘要吗？
 
-不会。只有调用了 `->name()` 或 `Route::name('xxx')` 显式命名的路由才会出现在 forge 上下文中。这是设计选择 —— 没有名字意味着不可引用，前端也不需要知道它。
+不会。只有显式命名的路由才进入 forge 摘要。没有名字意味着不可引用，前端也不需要知道它。
 
-### Q: 我在路由定义里用了 `->where('param', 'pattern')`，这个约束会出现在 forge 上下文里吗？
+### Q: 路由忘记归级了会怎样？
 
-会。它会被序列化成 forge 上下文 `params[].pattern` 字段。前端 `route()` 在 `strictParams: true` 模式下会校验参数值是否匹配 pattern。
+本项目 `strict_mode = true`：直接抛 `RouteTierNotAssignedException`（500）。这不是缺陷而是设计 ——
+未归级路由不进任何层级端点，也不进 `route:forge:types`，如果静默放行，症状会是「路由明明在、
+类型和调用都不通」，排查成本远高于一次显式异常。开发期宁可让它炸出来。
 
-### Q: `php artisan route:cache` 之后 forge 上下文是从缓存读还是实时读？
+### Q: 登录接口在管理端层级里，为什么未登录也能调？
 
-从缓存读。`@forgeSummary` 指令在渲染时会调用 `Route::getRoutes()`，Laravel 如果有路由缓存就返回缓存的 RouteCollection。所以：
-
-- 新增路由 → `php artisan route:clear` 或 `php artisan route:cache` 重建
-- 删除路由 → 同上
-
-### Q: 我不想让所有 API 路由都被导出，怎么做？
+管理端路由整体归 `manage` 层级受保护，但登录页本身要在未登录时可用。做法是给登录/登出显式
+归级，把这两个入口从层级保护里捞出来：
 
 ```php
-// config/route-forge.php
-'include_api_routes' => false,
+Route::post('/login', [AuthController::class, 'store'])->name('login')->tier('public');
 ```
 
-或者用 `exclude_patterns` 排除特定命名模式：
+被公开的只是这两个路由名与 URI，后台其余接口的元信息仍然拿不到。
+
+### Q: `route:cache` 之后 forge 摘要是从缓存读还是实时读？
+
+从缓存读。摘要生成时调用 `Route::getRoutes()`，Laravel 有路由缓存时返回缓存的 RouteCollection。
+新增/删除路由后记得重建缓存（`route:cache` / `route:clear`）。端点响应另有 `cache_ttl` 缓存， 路由变更后可用
+`route:forge:clear` 清掉 forge 侧缓存。
+
+### Q: 路由改名了，前端要同步改吗？
+
+过渡期不用。route-forge 提供别名机制：旧名继续可用，指向与新名完全相同的元信息，类型文件也会 为别名生成条目。
 
 ```php
-'exclude_patterns' => ['api.v1.admin.*', 'debugbar.*'],
+// 方式一：路由宏（显式，优先）
+Route::get(...)->name('api.items.index')->forgeAlias('api.products.index');
+
+// 方式二：config/forge.php（批量、集中管理）
+'aliases' => [
+    'api.products.index' => 'api.items.index',
+],
 ```
 
-### Q: forge 上下文有大小限制吗？
-
-技术上没有。但如果你的项目有几千条命名路由，生成的 JSON 可能达到几十 KB，会让每个页面多加载一份。建议：
-
-- 用 `exclude_patterns` 排除前端不需要的路由
-- 或者只在有需要的页面渲染 `@forgeSummary`（用 Blade `@if` 包裹）
-
----
+别名是过渡手段，改名稳定后应及时清理，避免两套名字长期并存。撞车时真实路由优先；别名指向不 存在的路由名会
+fail-fast 抛异常。
 
 ## 前端相关
 
 ### Q: 我不用 React，用 Vue / 原生 JS，还能用 route-forge 吗？
 
-可以。route-forge 提供了多个前端包：
+可以。route-forge 提供多个前端包：Vue 3 用 `@route-forge/vue`，React 用 `@route-forge/react`，
+不依赖框架直接用 `@route-forge/core`（`createForge()` 手动建实例，`forge.route()` /
+`forge.api()` 全量可用）。
 
-| 框架 | 包 |
-|------|---|
-| React 18/19 | `@route-forge/react` |
-| Vue 3 | `@route-forge/vue` |
-| 框架无关 | `@route-forge/core` |
+### Q: `route()` 和 React Router 的 `navigate()` 该用哪个？
 
-原生 JS 用 `@route-forge/core` 的 `createForge()`：
+- `route()` / `useForgeRoute` —— 只负责 **URL 生成**
+- `navigate(href)` —— 生成 URL 并触发 SPA 导航
 
-```js
-import { createForge } from '@route-forge/core';
+React Router 管「URL → 组件」映射，route-forge 管「路由名 → URL」生成，两者路由名建议一一对应：
 
-const forge = createForge(window.__FORGE__);
-forge.route('catalog.show', { slug: 'hello' });
+```jsx
+// 编程式导航
+const navigate = useNavigate();
+const forge = useForge({ level: 'public' });
+navigate(forge('api.catalogs.show', { slug }));
+
+// 声明式导航（ForgeLink 的 as 注入 react-router Link，SPA 内部跳转）
+<ForgeLink level="public" name="api.catalogs.show" params={{ slug }} as={Link}>
+  画册详情
+</ForgeLink>
 ```
 
-### Q: `route()` 和 React Router 的 `navigate()` / `Link` 该用哪个？
+### Q: 管理端路由名一调用就报错 / 返回空？
 
-- `route()` —— 只负责 **URL 生成**，纯函数
-- `navigate(route('xxx', params))` —— 生成 URL 并触发导航
-- `<Link to={route('xxx', params)}>` —— 声明式导航
+`manage` 层级是 `lazy` 的，路由明细要登录后由 `useForgeApi({ level: 'manage' })` 首次调用时
+自动拉取。未就绪时：
 
-两者配合是最佳实践：
+- `useForgeRoute('manage', ...)` 生成的 URL 是 `''`（不抛错，渲染不崩，就绪后自动补上）
+- `useForge({ level: 'manage' }).levelLoaded` 是布尔值，可用它切换骨架屏
+- `ForgeLink` / `ForgeRoute` 组件自带「未就绪渲染占位」行为
 
-```tsx
-import { Link, useNavigate } from 'react-router-dom';
-import { useRouteForge } from '@route-forge/react';
-
-function CatalogNav() {
-  const { route } = useRouteForge();
-  const navigate = useNavigate();
-
-  return (
-    <nav>
-      <Link to={route('catalog.index')}>画册列表</Link>
-      <button onClick={() => navigate(route('catalog.show', { slug: 'hello' }))}>
-        画册详情
-      </button>
-    </nav>
-  );
-}
-```
-
-如果项目没有 React Router，`route()` 可以直接作为 `href`：
-
-```tsx
-<a href={route('home')}>首页</a>
-```
+如果已登录仍报错，检查后端该层级是否配了 `endpoint_middleware` 且中间件把当前用户拒了。
 
 ### Q: 类型文件不更新怎么办？
 
 每次路由变更后重新生成：
 
 ```bash
-php artisan forge:types resources/js/types/forge.d.ts
-# 或
-composer forge
+php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
 ```
 
-如果还不生效，检查：
+还不生效则检查：
 
-1. 生成路径是否在 `tsconfig.json` 的 include 范围内
-2. VS Code 是否需要重启 TS Server（`Cmd+Shift+P` → "TypeScript: Restart TS Server"）
-3. 确认 `forge.d.ts` 文件确实被更新了（看文件的修改时间）
+1. 生成路径是否在 `jsconfig.json` / `tsconfig.json` 的 include 范围内
+2. 编辑器 TS Server 是否需要重启（VS Code：`Cmd/Ctrl+Shift+P` → "TypeScript: Restart TS Server"）
 
-### Q: 我能在 store / 工具函数 / 非组件文件中调用 `route()` 吗？
+### Q: 能在非组件上下文（工具函数、全局单例）里调用吗？
 
-`useRouteForge()` 是 React Hook，**只能在组件或自定义 Hook 顶层调用**，不能在普通函数、类、store 里调。非组件上下文用 `@route-forge/core` 直接创建实例：
+可以。`useForge` / `useForgeApi` 是 React Hooks，只能在组件里用；组件外用
+`@route-forge/core` 直接建实例：
 
-```ts
-// stores/catalog.ts（Zustand 示例）
-import { create } from 'zustand';
+```js
 import { createForge } from '@route-forge/core';
 
-const forge = createForge(window.__FORGE__);
-
-interface CatalogState {
-  selectedSlug: string | null;
-  goToDetail: (slug: string) => void;
-}
-
-export const useCatalogStore = create<CatalogState>((set) => ({
-  selectedSlug: null,
-  goToDetail: (slug) => {
-    const url = forge.route('catalog.show', { slug });
-    window.location.href = url;
-  },
-}));
+const forge = createForge(summary);          // 摘要对象或摘要端点地址
+forge.route('api.catalogs.show', { slug });
 ```
 
-### Q: SSR / Next.js 环境下 `window.__FORGE__` 不存在怎么办？
+### Q: 多个后端应用怎么路由隔离？
 
-服务端渲染时没有 `window` 对象。`@route-forge/react` 支持通过 Provider props 直接传入 forge 上下文：
-
-```tsx
-// Next.js app/layout.tsx
-import forgeContext from './forge.context.json';
-import { RouteForgeProvider } from '@route-forge/react';
-
-export default function RootLayout({ children }) {
-  return (
-    <html>
-      <body>
-        <RouteForgeProvider forge={forgeContext}>
-          {children}
-        </RouteForgeProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-forge 上下文 JSON 可以在构建时由后端预生成（`php artisan forge:export forge.context.json`）。
-
-### Q: 多个 Laravel 应用怎么路由隔离？
-
-`globalVariableName` 配置解决：
+层级名、端点前缀、摘要变量名都可配置：
 
 ```php
 // 应用 A
-'summary_variable_name' => '__FORGE_A__';
-
-// 应用 B
-'summary_variable_name' => '__FORGE_B__';
+'endpoint_prefix' => '/_forge/routes',
 ```
 
-前端对应配置：
-
-```tsx
-<RouteForgeProvider globalVariableName="__FORGE_A__">
-  <AppA />
-</RouteForgeProvider>
-```
-
----
+前端实例按应用各自创建即可，`@forgeSummary` 的访问器读后即删，同页多实例互不串味。
 
 ## 通用问题
 
-### Q: route-forge 和 Ziggy 有什么区别？
+### Q: route-forge 的能力边界是什么？
 
-[Ziggy](https://github.com/tighten/ziggy) 是另一个 Laravel 路由 JS 包。核心差异：
+route-forge 专注做一件事： **命名路由从前端到后端的双向贯通**。它能提供的：
 
-| 维度 | route-forge | Ziggy |
-|------|-------------|-------|
-| 架构 | 三包分离（core + 框架适配器 + laravel） | 单 PHP 包 + 内联 JS |
-| React 支持 | 原生 Provider + Hook | 有社区适配但非官方 |
-| Vue 3 支持 | 原生插件 + 组合式 API | 有社区适配但非官方 |
-| 类型生成 | 内置 `forge:types` 命令 | 需配合 ziggy-js-types |
-| 多框架 | Vue / React / core 任选 | 主要面向 Laravel + 原生 / Alpine |
-| 生态定位 | 完整的前后端路由类型安全方案 | Laravel 生态的 route() 到 JS 移植 |
+- 按层级归类与分发路由元信息（eager 注入 / lazy 拉取 / 端点保护）
+- 类型安全的 URL 生成（`route()`），名字、参数、正则约束全程校验
+- 按层级发请求的适配层（`api()` / `useForgeApi`），与 URL 生成共用同一套路由表
+- 类型下发（`route:forge:types`）与改名过渡（别名）
 
-两者解决的问题相同，选哪个取决于你项目的框架栈和团队偏好。
+它不做的：不是路由管理器（页面路由归 React Router / vue-router），不是状态管理，不是请求库的
+替代（HTTP 适配层只为「按路由名调接口」这一件事服务）。
 
 ### Q: 路由参数和查询参数有什么区别？
 
-- **路由参数**（Route Params）：URI 模板里的 `{slug}`，属于路由定义的一部分，影响路由匹配
-- **查询参数**（Query Params）：`?page=2&sort=name`，附加在 URL 末尾，不影响路由匹配
+- **路由参数**（Route Params）：URI 模板里的 `{slug}`，属于路由定义，影响匹配，forge 摘要有签名
+- **查询参数**（Query Params）：`?page=2`，附加在 URL 末尾，不影响匹配，调用时走 options
 
-```ts
-// 路由参数（必填，forge 上下文有定义）
-route('catalog.show', { slug: 'hello' });
-// → /catalog/hello
-
-// 查询参数（可选，通过 options.query 传入）
-route('catalog.index', {}, { query: { page: 2 } });
-// → /catalog?page=2
-
-// 同时传
-route('catalog.show', { slug: 'hello' }, { query: { preview: 1 } });
-// → /catalog/hello?preview=1
+```js
+call('api.catalogs.index', { query: { category: 'branding', page: 2 } });
+route('api.catalogs.show', { slug }, { query: { preview: 1 } });
 ```
 
 ### Q: 项目可以不依赖 route-forge 独立运行吗？
 
-不行。一旦你在 Blade 布局里用了 `@forgeSummary`、在 `main.tsx` 里用了 `<RouteForgeProvider>`，它们就是启动路径的硬依赖。但你可以：
-
-- 暂时不用 `route()` 做导航，退回硬编码 URL
-- 或者在 Blade 里用 `@if` 条件渲染 `@forgeSummary`
+不行。`@forgeSummary` 与插件初始化是启动路径的硬依赖。可以暂时不用 `route()` 做导航退回硬编码
+URL，但forge 摘要注入与解析链路保留 —— 这正是下一步迁移回类型安全调用的入口。
 
 ### Q: 安全方面需要注意什么？
 
-forge 上下文是公开的 HTML 内容，**不要在里面暴露敏感的后台路由名**。可能的风险和对策：
+forge 摘要与层级端点是按设计分级公开的：
 
-| 风险 | 对策 |
-|------|------|
-| 攻击者知道后台路由名后直接访问 | 后端路由有中间件保护（`Route::middleware('auth')`），名字知道了也进不去 |
-| 枚举内部 API 路由 | `exclude_patterns` 排除，或前端根本不引入这些路由 |
-| forge 上下文被爬取用于信息收集 | 这是普通 HTTP 响应的一部分，和暴露页面本身的风险相同 |
-
----
+| 风险                       | 对策                                                                         |
+|----------------------------|------------------------------------------------------------------------------|
+| 管理端路由名在登录前暴露   | `manage` 层级 `lazy` + `endpoint_middleware`，未登录连明细端点都进不来       |
+| 层级明细端点被滥用         | `endpoint_middleware` 保护；`cache_ttl` 控制缓存；`route:forge:clear` 可清   |
+| 调试管理器页面泄露         | 仅 `APP_DEBUG=true` 注册 + `manager_allowed_ips` IP 白名单，生产双保险不可见 |
+| 个别路由必须公开但怕误归级 | 显式 `->tier()` 优先级最高，语义清晰                                         |
 
 ## 故障排查速查
 
-### `RouteForgeProvider` 渲染时报 "window.__FORGE__ is undefined"
+### 页面报 "window. __ROUTE_FORGE__ is undefined"
 
-| 检查项 | 怎么查 |
-|--------|--------|
-| `@forgeSummary` 是否存在于 Blade 布局 | 搜索 `@forgeSummary` |
-| 是否在 JS 之前加载 | Blade 里 `@forgeSummary` 在 `@vite` 之上 |
-| 当前页面是否继承了布局 | 看 `home.blade.php` 有没有 `@extends('layout')` |
-| `config/route-forge.php` 的 variable name | 和 Provider 的 `globalVariableName` prop 一致 |
-| 路由是否被排除了 | `php artisan route:list` 确认有命名路由 |
+| 检查项                     | 怎么查                                                  |
+|----------------------------|---------------------------------------------------------|
+| `@forgeSummary` 是否存在   | 在 `index.blade.php` 里搜                               |
+| 是否早于 bundle 求值       | `<head>` 里、`@vite` 之前；app.jsx 须保持 module/defer  |
+| 是否想走网络摘要但没配     | `<RouteForgeProvider options={{ endpoint: '/_forge/routes' }}>` |
+| 摘要端点是否可用           | `curl http://localhost:8000/_forge/routes`              |
+| 路由是否有命名且已归级     | `php artisan route:forge:list`                          |
+| forge 端点缓存是否过期内容 | `php artisan route:forge:clear` 后刷新                  |
 
 ### `route('xxx')` 报 "Route not found"
 
-| 检查项 | 怎么查 |
-|--------|--------|
-| 路由名是否真的存在 | `php artisan route:list --name=xxx` |
-| 是否有拼写错误 | 注意点分隔符、大小写 |
-| 路由是否在 `exclude_patterns` 里 | 检查配置 |
-| 有没有 `route:cache` 之后改了路由没重建 | `php artisan route:clear` 后刷新 |
+| 检查项                       | 怎么查                            |
+|------------------------------|-----------------------------------|
+| 路由名是否真的存在           | `php artisan route:forge:list`    |
+| 拼写 / 点分隔 / 大小写       | 报错信息自带最接近名字建议        |
+| 是否是 lazy 层级还没加载     | 看 `levelLoaded`；登录后重试      |
+| 是否在别名清理期用了已删旧名 | `route:forge:list --aliases` 核对 |
 
-### `route()` 参数类型 TS 不报错
+### `route()` 参数类型 TS 不报错 / 报错不对
 
-| 检查项 | 怎么查 |
-|--------|--------|
-| `resources/js/types/forge.d.ts` 是否存在 | 文件系统里找 |
-| 是否是自动生成的 | `composer forge` 重新生成 |
-| `tsconfig.json` 是否 include 了这个路径 | 检查配置 |
-| VS Code 是否用了正确的 TS 版本 | 底部状态栏看 TS 版本，确保是 Workspace 的 |
+| 检查项                               | 怎么查                                 |
+|--------------------------------------|----------------------------------------|
+| `forge-routes.d.ts` 是否存在且最新   | 重跑 `route:forge:types --out=...`     |
+| 是否在 include 范围                  | 检查 `jsconfig.json` / `tsconfig.json` |
+| 是否重跑了类型命令但没重启 TS Server | Restart TS Server                      |
 
 ### 生成的 URL 和预期不符
 
-| 检查项 | 怎么查 |
-|--------|--------|
-| `APP_URL` 是否正确 | `.env` 里确认 |
-| 参数顺序 | `route()` 按名字匹配，和顺序无关 |
-| 可选参数有没有传 | 没传的话对应段会被移除 |
-| 是否传了 query 到 params 里 | query 要走 `options.query` |
+| 检查项                | 怎么查                           |
+|-----------------------|----------------------------------|
+| `APP_URL` 是否正确    | `.env` 里确认                    |
+| 参数顺序              | `route()` 按名字匹配，与顺序无关 |
+| 可选参数没传          | 对应 URL 段会被移除，属预期      |
+| 查询参数传进了 params | query 要走 `options.query`       |
 
 ---
 

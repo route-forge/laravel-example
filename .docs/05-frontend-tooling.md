@@ -1,7 +1,7 @@
-# 05 · 前端工程化：UnoCSS + Ant Design + React
+# 05 · 前端工程化：UnoCSS + JSX + Ant Design
 
-> 本文聚焦本项目前端基座的「怎么搭起来」—— Vite 插件链的执行顺序、Ant Design
-> 按需引入的配置细节、React 与 Blade 的样式边界。这些是本项目 P0 阶段的核心工程决策。
+> 本文聚焦本项目前端基座的「怎么搭起来」—— Vite 插件链的执行顺序、JSX 约定、Ant Design
+> 按需引入的配置细节、唯一 Blade 壳下的样式分层。这些是前端基座的核心工程决策。
 
 ---
 
@@ -10,94 +10,78 @@
 - [整体架构图](#整体架构图)
 - [Vite 插件链详解](#vite-插件链详解)
 - [UnoCSS 原子化 CSS](#unocss-原子化-css)
+- [JSX 模板约定](#jsx-模板约定)
 - [Ant Design 按需引入](#ant-design-按需引入)
 - [CSS 注入顺序陷阱](#css-注入顺序陷阱)
-- [Blade 与 React 的样式边界](#blade-与-react-的样式边界)
+- [唯一 Blade 壳下的样式分层](#唯一-blade-壳下的样式分层)
 
 ---
 
 ## 整体架构图
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      vite.config.ts                         │
-│                                                             │
-│  ┌─────────┐  ┌────────┐  ┌────────┐  ┌────────┐  ┌──────┐ │
-│  │ Laravel │→ │ UnoCSS │→ │ React  │→ │  Ant   │→ │AutoIm│ │
-│  │ plugin  │  │        │  │plugin  │  │ Design │  │ port │ │
-│  └─────────┘  └────────┘  └────────┘  └────────┘  └──────┘ │
-│       │             │          │            │            │   │
-│       ▼             ▼          ▼            ▼            ▼   │
-│  ┌────────┐  ┌──────────────┐ ┌──────────────┐ ┌─────────┐│
-│  │ Blade  │  │ virtual:uno  │ │ @ant-design  │ │ 按需注入││
-│  │ 热更新  │  │ .css        │ │ /es/xxx      │ │ message ││
-│  └────────┘  └──────────────┘ └──────────────┘ └─────────┘│
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         vite.config.js                            │
+│                                                                   │
+│  ┌─────────┐  ┌────────┐  ┌─────────┐  ┌──────────────────────┐  │
+│  │ Laravel │→ │ UnoCSS │→ │  React  │→ │ @ant-design/vite-    │  │
+│  │ plugin  │  │        │  │ plugin  │  │ plugin（antd 按需）  │  │
+│  └─────────┘  └────────┘  └─────────┘  └──────────────────────┘  │
+│       │             │           │                │                 │
+│       ▼             ▼           ▼                ▼                 │
+│  ┌────────┐  ┌──────────────┐ ┌────────────┐ ┌─────────────────┐ │
+│  │ Blade  │  │ virtual:uno  │ │ JSX/Fast   │ │ antd 样式按需   │ │
+│  │ 热更新  │  │ .css        │ │ Refresh    │ │ 优化            │ │
+│  └────────┘  └──────────────┘ └────────────┘ └─────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
 ```
 
 ## Vite 插件链详解
 
+完整配置见 `vite.config.js`，这里逐个解释每个插件的角色和选型理由。
+
 ### 1. laravel-vite-plugin
 
-```ts
+```js
 laravel({
-  input: ['resources/css/app.css', 'resources/js/main.tsx'],
+  input: ['resources/css/app.css', 'resources/js/app.jsx'],
   refresh: true,
-  fonts: [bunny('Instrument Sans', { weights: [400, 500, 600] })],
 })
 ```
 
 - **作用**：让 Vite 和 Laravel 的 `@vite` 指令协同工作，提供热更新
-- **fonts 配置**：通过 Bunny Fonts 服务自托管 Instrument Sans，不需要 Google Fonts CDN
+- `refresh` 检测 Blade 与路由文件变动自动刷新
 
 ### 2. UnoCSS
 
-```ts
+```js
 UnoCSS()
 ```
 
 - **作用**：扫描 `content` 目录下的文件，将原子类转成 CSS
-- 配置在 `uno.config.ts`（或 `.js`），见下文 UnoCSS 章节
+- 配置在 `uno.config.js`，见下文 UnoCSS 章节
 
 ### 3. @vitejs/plugin-react
 
-```ts
+```js
 react()
 ```
 
-- **作用**：编译 `.tsx` 文件，支持 Fast Refresh（HMR）和 JSX 转换
-- React 19 推荐用这个插件，比老的 `@vitejs/plugin-react-swc` 更稳定
+- **作用**：编译 JSX、启用 Fast Refresh（组件级热替换，保留 state）
 
 ### 4. @ant-design/vite-plugin
 
-```ts
-import Antd from '@ant-design/vite-plugin';
-
-Antd({
-  style: true, // 自动按需注入组件样式
-})
+```js
+AntdPlugin()
 ```
 
-- **作用**：Ant Design 官方 Vite 插件，实现组件 + 样式按需引入
-- 不需要额外配 `unplugin-auto-import` 或 `unplugin-vue-components` 里的 resolver
-
-### 5. unplugin-auto-import（可选）
-
-```ts
-AutoImport({
-  imports: ['react', 'react-router-dom'],
-  dts: fileURLToPath(new URL('./resources/js/types/auto-imports.d.ts', import.meta.url)),
-})
-```
-
-- **作用**：自动注入 React Hooks（`useState`, `useEffect` 等）和 React Router API
-- 如果团队倾向显式 import，可以删掉这个插件，纯手动管理 import
+- **作用**：Ant Design 按需引入优化 —— 组件与样式的 import 自动瘦身，产物只含用到的部分
 
 ## UnoCSS 原子化 CSS
 
 ### 核心思路
 
-在 Blade / JSX 里直接写 class 名字，UnoCSS 扫描后生成对应 CSS：
+在 JSX / Blade 里直接写 class 名字，UnoCSS 扫描后生成对应 CSS：
 
 ```jsx
 // 写 class 名
@@ -106,21 +90,18 @@ AutoImport({
 // UnoCSS 自动生成 CSS
 .mt-8 { margin-top: 2rem; }
 .flex { display: flex; }
-.flex-wrap { flex-wrap: wrap; }
-.items-center { align-items: center; }
-.gap-3 { gap: 0.75rem; }
 ```
 
 ### 本项目的 UnoCSS 配置要点
 
-```ts
-// uno.config.ts（示意）
+```js
+// uno.config.js（示意）
 export default defineConfig({
   presets: [presetUno()],
   content: {
     filesystem: [
-      'resources/views/**/*.blade.php',   // ← Blade 模板也扫
-      'resources/js/**/*.{ts,tsx,js,jsx}',
+      'resources/views/**/*.blade.php',   // ← Blade 壳也扫
+      'resources/js/**/*.{jsx,js,ts}',    // ← JSX 源码
     ],
   },
   shortcuts: [
@@ -140,7 +121,6 @@ export default defineConfig({
       },
     },
   },
-  transformers: [transformerDirectives()], // 支持 @apply
 });
 ```
 
@@ -149,94 +129,90 @@ export default defineConfig({
 shortcuts 是「组件级」的原子类组合 —— 一次写好，多处复用：
 
 ```jsx
-// 任何地方都可以
-<div className="shell">...</div>      {/* → mx-auto w-full max-w-6xl ... */}
-<p className="lead">...</p>           {/* → text-base md:text-lg ... */}
+<div className="shell">...</div>      // → mx-auto w-full max-w-6xl ...
+<p className="lead">...</p>           // → text-base md:text-lg ...
 ```
 
-组件里的 `@apply` 也依赖 UnoCSS 的 `transformerDirectives`：
+> ⚠️ UnoCSS theme.breakpoints 绕过 deep merge：只写子集会整套替换，所有 `md:` / `sm:`
+> 变体静默失配且无报错 —— 自定义断点必须写全量 map。
 
-```css
-/* App.css 或 .module.css */
-.eyebrow {
-  @apply text-xs font-semibold uppercase tracking-[0.22em] text-brand-500;
-}
+## JSX 模板约定
+
+本项目用 JSX 而非模板引擎，约定如下：
+
+### 条件与列表直接用 JS
+
+```jsx
+{items.map(item => (
+  <CatalogCard key={item.id} item={item} />
+))}
+
+{loaded ? <CatalogDetail /> : <Skeleton />}
 ```
+
+没有指令层，逻辑就是 JavaScript —— 这是 JSX 相对模板语法的核心优势，也是本项目不引入
+模板引擎的原因。
+
+### className 而不是 class
+
+```jsx
+// ❌ JSX 里 class 是保留字
+<div class="shell">
+
+// ✅
+<div className="shell">
+```
+
+### 样式方案优先级
+
+1. UnoCSS 原子类（默认）
+2. shortcuts（复用组合）
+3. CSS Modules / 内联 style（仅组件私有动态样式）
 
 ## Ant Design 按需引入
 
 ### 为什么不用全量引入
 
-```tsx
-// ❌ 全量引入（不要这样做）
-import { ConfigProvider, Button, Card } from 'antd';
-import 'antd/dist/reset.css'; // 约 150KB+
+全量引入（`import 'antd/dist/reset.css'` + 全量 import）会把整个组件库打进产物。按需引入让
+最终产物只包含你用到的组件。
+
+### 按需引入配置
+
+```js
+// vite.config.js
+import AntdPlugin from '@ant-design/vite-plugin';
+
+export default defineConfig({
+  plugins: [laravel(...), UnoCSS(), react(), AntdPlugin()],
+});
 ```
 
-全量引入会把 Ant Design 整套 reset.css + 所有组件样式都打进去，即使你只用 `<Button>`。按需引入让最终产物只包含你用到的组件。
+`@ant-design/vite-plugin` 自动处理组件与样式的按需 import。
 
-### 按需引入的三层配置
+### 图标显式引入
 
-#### 1. 组件样式按需注入
+图标显式 import，便于 tree-shake 与代码检索：
 
-`@ant-design/vite-plugin` 会自动处理：
+```jsx
+import { Search } from '@ant-design/icons';
 
-```ts
-// vite.config.ts
-import Antd from '@ant-design/vite-plugin';
-
-Antd({ style: true })
+<Search />
 ```
 
-然后在组件里正常 import 组件，插件会自动注入对应样式：
+### 中文语境
 
-```tsx
-// ✅ 正常写 import，不需要管样式
-import { Button, Card, message } from 'antd';
-
-function ProductCard({ product }) {
-  return (
-    <Card title={product.name}>
-      <Button type="primary" onClick={() => message.success('已加入询购')}>
-        立即询购
-      </Button>
-    </Card>
-  );
-}
-```
-
-#### 2. 图标按需引入
-
-```tsx
-import { SearchOutlined, ShoppingCartOutlined } from '@ant-design/icons';
-
-function Header() {
-  return (
-    <span>
-      <SearchOutlined />
-      <ShoppingCartOutlined />
-    </span>
-  );
-}
-```
-
-`@ant-design/icons` 每个图标是独立的 React 组件，tree-shake 天然生效。
-
-#### 3. ConfigProvider 设置中文
-
-```tsx
-import { ConfigProvider } from 'antd';
+```jsx
 import zhCN from 'antd/locale/zh_CN';
+import { ConfigProvider } from 'antd';
 
-// main.tsx 根组件
 <ConfigProvider locale={zhCN}>
-  <RouteForgeProvider>
-    <App />
-  </RouteForgeProvider>
+  <RouterProvider router={router} />
 </ConfigProvider>
 ```
 
 ## CSS 注入顺序陷阱
+
+这是本项目 `resources/js/app.jsx` 顶部注释花大篇幅解释的问题，总结在此：
 
 ### CSS 优先级规则
 
@@ -246,69 +222,46 @@ Ant Design 的组件样式和 UnoCSS 的工具类特异性很接近，必须让 
 
 ### 本项目的顺序安排
 
-```blade
-{{-- layout.blade.php --}}
-@vite(['resources/css/app.css', 'resources/js/main.tsx'])
-```
-
-```ts
-// main.tsx —— UnoCSS 放在最后 import
-import React from 'react';
-import { createRoot } from 'react-dom/client';
-import App from './App';
-import 'virtual:uno.css';  // ← UnoCSS 最后加载
+```js
+// app.jsx —— import 顺序 = 模块求值顺序
+import 'antd/dist/reset.css';   // antd reset 最先
+import 'resources/css/app.css'; // 基线变量
+import 'virtual:uno.css';       // UnoCSS preflight + 工具类（最后求值）
 ```
 
 执行顺序：
 
 ```
-1. Ant Design 组件库样式（随 JS 依赖图先注入）
-2. virtual:uno.css（UnoCSS，最后注入）
+1. antd reset —— 基线重置
+2. Ant Design 组件样式（随组件按需注入）
+3. virtual:uno.css（UnoCSS，最后注入）
 → UnoCSS 的 .bg-brand-500 能覆盖 Ant Design 默认背景色 ✅
 ```
 
-如果把 UnoCSS 放在 Ant Design 之前，`bg-brand-500` 就会被 Ant Design 的默认背景覆盖 —— 表现为「class 写了但颜色没变」，非常隐蔽。
+如果把 UnoCSS 放在 Ant Design 之前，`bg-brand-500` 就会被 antd 的默认背景覆盖 —— 表现为
+「className 写了但颜色没变」，非常隐蔽。
 
-## Blade 与 React 的样式边界
+## 唯一 Blade 壳下的样式分层
 
-本项目是 Blade 做壳、React 做内容的混合架构，样式分三层：
+前后端分离后，Blade 只剩一个壳（`index.blade.php`），样式分四层：
 
-| 层 | 载体 | 作用 | 示例 |
-|----|------|------|------|
-| **Blade 层** | `resources/css/app.css` + Blade 内联 | 全站基线样式、UnoCSS preflight | `body { ... }`, `@fonts` |
-| **React 全局层** | `virtual:uno.css` + Ant Design 样式 | UnoCSS 工具类、Ant Design 默认样式 | `.mt-8`, `.ant-btn` |
-| **React 组件层** | CSS Modules 或 styled-components | 组件私有样式 | `.eyebrow`, `.chip` |
+| 层                | 载体                                        | 作用                                   | 示例                     |
+|-------------------|---------------------------------------------|----------------------------------------|--------------------------|
+| **Blade 壳层**    | `resources/css/app.css`（@vite 独立入口）   | 全站基线变量、字体                     | `body { ... }`           |
+| **UnoCSS 层**     | `virtual:uno.css`（app.jsx 里最后 import）  | preflight、工具类、shortcuts           | `.mt-8`, `.shell`        |
+| **组件库层**      | Ant Design 按需样式                         | 组件默认样式                           | `.ant-btn`               |
+| **React 组件层**  | CSS Modules / 内联 style                    | 组件私有样式                           | `.eyebrow`, `.chip`      |
 
-### Blade 模板里也能用 UnoCSS
+### Blade 壳里的原子类
 
 ```blade
-{{-- layout.blade.php --}}
+{{-- index.blade.php --}}
 <body class="bg-white text-gray-800 antialiased">
 ```
 
-之所以能生效，是因为 `uno.config.ts` 的 `content.filesystem` 包含了 `resources/views/**/*.blade.php`。UnoCSS 会扫描 Blade 文件里的 class 名并生成对应 CSS。
-
-### React 组件的局部样式
-
-推荐用 **CSS Modules**：
-
-```tsx
-// components/Header.tsx
-import styles from './Header.module.css';
-
-function Header() {
-  return <header className={styles.navbar}>...</header>;
-}
-```
-
-```css
-/* Header.module.css */
-.navbar {
-  @apply flex items-center justify-between py-4;
-}
-```
-
-CSS Modules 自动 hash 类名，避免与全局样式冲突。
+之所以能生效，是因为 `uno.config.js` 的 `content.filesystem` 包含
+`resources/views/**/*.blade.php`。UnoCSS 会扫描 Blade 文件里的 class 名并生成对应 CSS ——
+壳里这几个类同时也是「扫描链路是否健康」的验收样例。
 
 ---
 

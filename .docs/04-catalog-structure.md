@@ -1,291 +1,283 @@
 # 04 · 企业画册：栏目结构与内容模型
 
-> 本文是画册的「产品设计文档」—— 把栏目划分、路由表设计、数据库 Schema、前后端字段契约一次性定下来。
-> route-forge 的价值在这里最直观：**路由表即产品结构**。
-
-> 💡 本文与 Vue 版 **完全相同** —— 路由表、数据库 Schema、API Response 都是后端定义的，和前端框架无关。
+> 本文是画册的「产品设计 + 数据规划」文档 —— 前台三页、管理端四块、完整路由表、数据库
+> Schema、前后端字段契约一次性定下来。route-forge 的价值在这里最直观：路由表即产品结构。
 
 ---
 
 ## 目录
 
-- [画册栏目总览](#画册栏目总览)
+- [产品定位](#产品定位)
+- [页面规划](#页面规划)
 - [完整路由表](#完整路由表)
-- [数据库 Schema](#数据库-schema)
+- [数据模型](#数据模型)
 - [前后端字段契约](#前后端字段契约)
 - [目录结构对应](#目录结构对应)
 
 ---
 
-## 画册栏目总览
+## 产品定位
 
-企业画册定位于「公司官网 + 产品展示 + 品牌故事」三位一体的单页多栏目应用。分为 **5 大栏目**：
+企业宣传画册：对外展示公司形象与业务能力的线上翻页画册。前台给访客「看」，管理端给运营 「维护」——
+画册内容全部后台可配置，不写死在前端。
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  画册导航                                                │
-│                                                         │
-│  首页 Home        · 品牌一句话介绍 + 核心亮点 + CTA       │
-│  关于 About      · 公司简介 / 发展历程 / 团队            │
-│  产品 Products   · 产品分类 → 产品详情                   │
-│  案例 Catalog    · 画册列表 → 画册详情                   │
-│  联系 Contact    · 表单 + 地图 + 联系方式                │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│  前台（访客）                                         │
+│                                                      │
+│  首页       · 品牌展示 + 精选画册入口                  │
+│  画册列表   · 按分类浏览，卡片入口                     │
+│  画册详情   · 翻页式阅读（PageFlip），逐页展示         │
+│                                                      │
+├──────────────────────────────────────────────────────┤
+│  管理端（登录）                                       │
+│                                                      │
+│  基础资料    · 站点名称 / 品牌信息 / 联系方式          │
+│  分类        · 画册分类增删改查与排序                  │
+│  画册列表    · 画册增删改查、发布状态、归属分类        │
+│  画册页数据  · 单本画册内页的增删改查与排序            │
+└──────────────────────────────────────────────────────┘
 ```
+
+## 页面规划
+
+### 前台（React Router 页面路由，数据走 `useForgeApi({ level: 'public' })`）
+
+| 页面         | 路径              | 数据来源                                      | 核心交互                |
+|--------------|-------------------|-----------------------------------------------|-------------------------|
+| HomePage     | `/`               | `api.site.show` + `api.catalogs.index`        | 品牌区 + 精选画册卡片   |
+| CatalogsPage | `/catalogs`       | `api.categories.index` + `api.catalogs.index` | 分类筛选 + 卡片列表     |
+| CatalogPage  | `/catalogs/:slug` | `api.catalogs.show`                           | PageFlip 翻页，逐页阅读 |
+
+### 管理端（`/admin` 下异步 chunk，数据走 `useForgeApi({ level: 'manage' })`）
+
+| 模块       | 功能                                                 |
+|------------|------------------------------------------------------|
+| 登录       | JSON 登录（成功后由前端决定跳转，服务端不 redirect） |
+| 基础资料   | 站点级单条配置的查看与更新                           |
+| 分类管理   | 列表 / 新增 / 编辑 / 删除 / 排序                     |
+| 画册管理   | 列表 / 新增 / 编辑 / 删除 / 发布状态 / 归属分类      |
+| 画册页管理 | 选中画册后的内页列表 / 新增 / 编辑 / 删除 / 排序     |
 
 ## 完整路由表
 
-所有路由都有命名，由 `route-forge/laravel` 自动纳入 forge 上下文：
+全部路由有命名，由 `route-forge/laravel`
+归入层级（归级方式见 [02](02-backend-integration.md#路由归级的三条通道)）：
 
 ```php
-// routes/web.php
+// ── routes/api.php —— level: public（eager，match.prefix = ['api'] 自动命中）──
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\HomeController;
-use App\Http\Controllers\AboutController;
-use App\Http\Controllers\ProductController;
-use App\Http\Controllers\CatalogController;
-use App\Http\Controllers\ContactController;
-
-// ── 首页 ──────────────────────────────────────────────
-Route::name('home')->get('/', [HomeController::class, 'index']);
-
-// ── 关于 ──────────────────────────────────────────────
-Route::name('about.')->group(function () {
-    Route::name('company')->get('/about', [AboutController::class, 'company']);
-    Route::name('timeline')->get('/about/timeline', [AboutController::class, 'timeline']);
-    Route::name('team')->get('/about/team', [AboutController::class, 'team']);
+Route::prefix('api')->name('api.')->group(function () {
+    Route::get('/site',      [SiteController::class, 'show'])->name('site.show');
+    Route::get('/categories', [CategoryController::class, 'index'])->name('categories.index');
+    Route::get('/catalogs',  [CatalogController::class, 'index'])->name('catalogs.index');
+    Route::get('/catalogs/{slug}', [CatalogController::class, 'show'])->name('catalogs.show');
 });
 
-// ── 产品 ──────────────────────────────────────────────
-Route::name('products.')->group(function () {
-    Route::name('index')->get('/products', [ProductController::class, 'index']);
-    Route::name('category')->get('/products/{category}', [ProductController::class, 'category']);
-    Route::name('show')->get('/products/{category}/{slug}', [ProductController::class, 'show']);
-});
+// ── routes/manage.php —— level: manage（lazy，prefix 'manage' 自动命中）──
+// 登录/登出例外：显式 ->tier('public')，登录页要在未登录时可用
 
-// ── 画册 ──────────────────────────────────────────────
-Route::name('catalog.')->group(function () {
-    Route::name('index')->get('/catalog', [CatalogController::class, 'index']);
-    Route::name('show')->get('/catalog/{slug}', [CatalogController::class, 'show']);
-});
+Route::post('/login',  [AuthController::class, 'store'])->name('login')->tier('public');
+Route::post('/logout', [AuthController::class, 'destroy'])->name('logout')->tier('public');
 
-// ── 联系 ──────────────────────────────────────────────
-Route::name('contact.')->group(function () {
-    Route::name('form')->get('/contact', [ContactController::class, 'form']);
-    Route::name('submit')->post('/contact', [ContactController::class, 'submit']);
+Route::middleware('manage')->prefix('api')->name('api.')->group(function () {
+    // 基础资料
+    Route::put('/site', [SiteController::class, 'update'])->name('site.update');
+
+    // 分类
+    Route::resource('categories', CategoryController::class)
+        ->except('create', 'edit')->names('categories');
+
+    // 画册
+    Route::resource('catalogs', CatalogController::class)
+        ->except('create', 'edit')->names('catalogs');
+
+    // 画册页（嵌套在画册下）
+    Route::get('/catalogs/{catalog}/pages',       [PageController::class, 'index'])->name('catalogs.pages.index');
+    Route::post('/catalogs/{catalog}/pages',      [PageController::class, 'store'])->name('catalogs.pages.store');
+    Route::post('/catalogs/{catalog}/pages/reorder', [PageController::class, 'reorder'])->name('catalogs.pages.reorder');
+    Route::put('/pages/{page}',    [PageController::class, 'update'])->name('pages.update');
+    Route::delete('/pages/{page}', [PageController::class, 'destroy'])->name('pages.destroy');
 });
 ```
 
-### forge 上下文产出预览
+forge 摘要产出预览（公开侧）：
 
-上面这 11 条路由会在 forge 上下文中生成：
+| 路由名                 | URI                    | 方法 | 必填参数 |
+|------------------------|------------------------|------|----------|
+| `api.site.show`        | `/api/site`            | GET  | —        |
+| `api.categories.index` | `/api/categories`      | GET  | —        |
+| `api.catalogs.index`   | `/api/catalogs`        | GET  | —        |
+| `api.catalogs.show`    | `/api/catalogs/{slug}` | GET  | `slug`   |
 
-| 路由名 | URI | 方法 | 必填参数 |
-|--------|-----|------|---------|
-| `home` | `/` | GET | — |
-| `about.company` | `/about` | GET | — |
-| `about.timeline` | `/about/timeline` | GET | — |
-| `about.team` | `/about/team` | GET | — |
-| `products.index` | `/products` | GET | — |
-| `products.category` | `/products/{category}` | GET | `category` |
-| `products.show` | `/products/{category}/{slug}` | GET | `category`, `slug` |
-| `catalog.index` | `/catalog` | GET | — |
-| `catalog.show` | `/catalog/{slug}` | GET | `slug` |
-| `contact.form` | `/contact` | GET | — |
-| `contact.submit` | `/contact` | POST | — |
+管理端同名规则，前缀 `manage.`（如 `manage.api.catalogs.show`），登录后经 `useForgeApi({ level: 'manage' })`
+懒加载可用。
 
-前端可直接消费：
+## 数据模型
 
-```tsx
-import { Link } from 'react-router-dom';
-import { useRouteForge } from '@route-forge/react';
+五张表（SQLite 起步，字段类型对 Laravel 迁移友好）：
 
-function Header() {
-  const { route } = useRouteForge();
-  return (
-    <nav>
-      <Link to={route('home')}>首页</Link>
-      <Link to={route('catalog.show', { slug: 'company-intro' })}>公司画册</Link>
-      <Link to={route('products.show', { category: 'hardware', slug: 'router-x1' })}>产品</Link>
-    </nav>
-  );
-}
-```
+### site_settings（基础资料）
 
-## 数据库 Schema
-
-### products（产品）
+站点级单行配置：
 
 ```sql
-CREATE TABLE products (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  category VARCHAR(50) NOT NULL COMMENT '分类 slug: hardware / software / service',
-  slug VARCHAR(100) NOT NULL COMMENT '产品 URL slug',
-  name VARCHAR(200) NOT NULL COMMENT '产品名称',
-  tagline VARCHAR(300) NULL COMMENT '一句话卖点',
-  description TEXT NOT NULL COMMENT '详细描述（富文本）',
-  cover_image VARCHAR(500) NULL COMMENT '封面图 URL',
-  gallery JSON NULL COMMENT '图集',
-  features JSON NULL COMMENT '特性列表 [{ icon, title, desc }]',
-  specifications JSON NULL COMMENT '技术规格 { key: value }',
-  sort_order INT DEFAULT 0,
-  is_published TINYINT(1) DEFAULT 1,
-  created_at TIMESTAMP NULL,
-  updated_at TIMESTAMP NULL,
-  UNIQUE KEY unique_category_slug (category, slug)
+CREATE TABLE site_settings
+(
+    id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    site_name      VARCHAR(200) NOT NULL COMMENT '站点名称',
+    brand_slogan   VARCHAR(300) NULL COMMENT '品牌口号（首页展示）',
+    logo_url       VARCHAR(500) NULL COMMENT 'Logo 图片地址',
+    intro          TEXT NULL COMMENT '公司简介（富文本）',
+    contact_phone  VARCHAR(50)  NULL,
+    contact_email  VARCHAR(200) NULL,
+    contact_address VARCHAR(500) NULL,
+    icp            VARCHAR(100) NULL COMMENT '备案号（页脚展示）',
+    created_at     TIMESTAMP NULL,
+    updated_at     TIMESTAMP NULL
+);
+```
+
+### categories（分类）
+
+```sql
+CREATE TABLE categories
+(
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name       VARCHAR(100) NOT NULL COMMENT '分类名称',
+    slug       VARCHAR(100) NOT NULL UNIQUE,
+    sort_order INT DEFAULT 0,
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL
 );
 ```
 
 ### catalogs（画册）
 
 ```sql
-CREATE TABLE catalogs (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  slug VARCHAR(100) NOT NULL UNIQUE,
-  title VARCHAR(200) NOT NULL,
-  summary VARCHAR(500) NULL,
-  cover_image VARCHAR(500) NULL,
-  pages JSON NOT NULL COMMENT '画册页面 [{ title, content, image }]',
-  publish_date DATE NULL,
-  sort_order INT DEFAULT 0,
-  is_published TINYINT(1) DEFAULT 1,
-  created_at TIMESTAMP NULL,
-  updated_at TIMESTAMP NULL
+CREATE TABLE catalogs
+(
+    id           BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    category_id  BIGINT UNSIGNED NULL COMMENT '归属分类，可空 = 未分类',
+    slug         VARCHAR(100) NOT NULL UNIQUE,
+    title        VARCHAR(200) NOT NULL,
+    summary      VARCHAR(500) NULL COMMENT '一句话简介（列表卡片用）',
+    cover_url    VARCHAR(500) NULL COMMENT '封面图',
+    is_featured  TINYINT(1) DEFAULT 0 COMMENT '是否精选（首页展示）',
+    is_published TINYINT(1) DEFAULT 0 COMMENT '发布状态：未发布前台不可见',
+    published_at DATE NULL,
+    sort_order   INT DEFAULT 0,
+    created_at   TIMESTAMP NULL,
+    updated_at   TIMESTAMP NULL,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 ```
 
-### team_members（团队成员）
+### catalog_pages（画册页）
+
+单本画册的内页，独立成表而非 JSON 列 —— 内页需要独立排序与逐条编辑：
 
 ```sql
-CREATE TABLE team_members (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  role VARCHAR(100) NOT NULL COMMENT '职位',
-  department VARCHAR(100) NULL COMMENT '部门',
-  avatar VARCHAR(500) NULL,
-  bio TEXT NULL,
-  sort_order INT DEFAULT 0,
-  is_active TINYINT(1) DEFAULT 1,
-  created_at TIMESTAMP NULL,
-  updated_at TIMESTAMP NULL
+CREATE TABLE catalog_pages
+(
+    id         BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    catalog_id BIGINT UNSIGNED NOT NULL,
+    title      VARCHAR(200) NOT NULL COMMENT '页标题',
+    content    TEXT NULL COMMENT '页正文（富文本）',
+    image_url  VARCHAR(500) NULL COMMENT '页主图',
+    sort_order INT DEFAULT 0 COMMENT '页序（翻页顺序）',
+    created_at TIMESTAMP NULL,
+    updated_at TIMESTAMP NULL,
+    FOREIGN KEY (catalog_id) REFERENCES catalogs(id) ON DELETE CASCADE
 );
 ```
 
-### contact_messages（联系留言）
+### users（管理账号）
 
-```sql
-CREATE TABLE contact_messages (
-  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  email VARCHAR(200) NOT NULL,
-  company VARCHAR(200) NULL,
-  phone VARCHAR(50) NULL,
-  subject VARCHAR(200) NULL,
-  message TEXT NOT NULL,
-  status ENUM('new', 'read', 'replied', 'archived') DEFAULT 'new',
-  created_at TIMESTAMP NULL,
-  updated_at TIMESTAMP NULL
-);
-```
+在 users 表追加 `is_manager` 布尔位区分管理账号；管理端访问控制走 `manage` 中间件 （登录 + is_manager
+校验），与 forge 层级的 `endpoint_middleware` 共用同一闸门。
 
 ## 前后端字段契约
 
-后端 Eloquent 模型返回的 JSON 结构，前端按这个契约消费。
+后端 API Resource 输出，前端按此消费。
 
-### Product API Response
-
-```json
-{
-  "id": 1,
-  "category": "hardware",
-  "slug": "router-x1",
-  "name": "Router X1 企业级路由器",
-  "tagline": "千兆性能，企业首选",
-  "description": "<p>富文本描述...</p>",
-  "cover_image": "https://cdn.example.com/products/router-x1/cover.jpg",
-  "gallery": [
-    "https://cdn.example.com/products/router-x1/gallery-1.jpg",
-    "https://cdn.example.com/products/router-x1/gallery-2.jpg"
-  ],
-  "features": [
-    { "icon": "Zap", "title": "千兆吞吐", "desc": "10/100/1000Mbps 全千兆端口" },
-    { "icon": "Shield", "title": "企业安全", "desc": "内置防火墙 + VPN 透传" }
-  ],
-  "specifications": {
-    "ports": "8 × 千兆 RJ45",
-    "cpu": "双核 1.2GHz",
-    "ram": "512MB"
-  }
-}
-```
-
-### Catalog API Response
+### CatalogListItem（列表卡片）
 
 ```json
 {
-  "id": 1,
-  "slug": "company-intro-2024",
-  "title": "企业介绍画册 2024",
-  "summary": "一份完整展示公司实力、产品矩阵和成功案例的年度画册",
-  "cover_image": "https://cdn.example.com/catalogs/company-2024/cover.jpg",
-  "pages": [
-    { "title": "公司概览", "content": "<p>...</p>", "image": null },
-    { "title": "产品矩阵", "content": "<p>...</p>", "image": "https://..." }
-  ],
-  "publish_date": "2024-03-15"
-}
-```
-
-### 团队成员 API Response
-
-```json
-[
-  {
     "id": 1,
-    "name": "张三",
-    "role": "CEO",
-    "department": "管理层",
-    "avatar": "https://cdn.example.com/team/zhangsan.jpg",
-    "bio": "2010 年创立公司..."
-  }
-]
+    "slug": "company-2026",
+    "title": "企业介绍画册 2026",
+    "summary": "一份完整展示公司实力与产品矩阵的年度画册",
+    "cover_url": "https://cdn.example.com/catalogs/company-2026/cover.jpg",
+    "category": { "id": 2, "name": "公司宣传", "slug": "branding" },
+    "is_featured": true,
+    "published_at": "2026-03-15"
+}
+```
+
+### CatalogDetail（详情 = 全部页数据）
+
+```json
+{
+    "id": 1,
+    "slug": "company-2026",
+    "title": "企业介绍画册 2026",
+    "summary": "一份完整展示公司实力与产品矩阵的年度画册",
+    "cover_url": "https://cdn.example.com/catalogs/company-2026/cover.jpg",
+    "pages": [
+        { "id": 11, "title": "公司概览", "content": "<p>…</p>", "image_url": null, "sort_order": 1 },
+        { "id": 12, "title": "产品矩阵", "content": "<p>…</p>", "image_url": "https://…", "sort_order": 2 }
+    ]
+}
+```
+
+详情一次带出全部内页：翻页阅读是纯前端行为，翻页不再发请求。
+
+### SiteSettings（基础资料）
+
+```json
+{
+    "site_name": "某某科技",
+    "brand_slogan": "让每一页都有说服力",
+    "logo_url": "https://cdn.example.com/logo.png",
+    "intro": "<p>…</p>",
+    "contact_phone": "400-000-0000",
+    "contact_email": "hello@example.com",
+    "contact_address": "…",
+    "icp": "苏ICP备XXXXXXXX号"
+}
 ```
 
 ## 目录结构对应
 
-| 栏目 | 后端 Controller | 前端页面组件 | 路由名前缀 |
-|------|----------------|-------------|-----------|
-| 首页 | `HomeController` | `pages/Home.tsx` | `home` |
-| 关于 | `AboutController` | `pages/AboutCompany.tsx`, `pages/AboutTimeline.tsx`, `pages/AboutTeam.tsx` | `about.*` |
-| 产品 | `ProductController` | `pages/ProductsIndex.tsx`, `pages/ProductsCategory.tsx`, `pages/ProductsShow.tsx` | `products.*` |
-| 画册 | `CatalogController` | `pages/CatalogIndex.tsx`, `pages/CatalogShow.tsx` | `catalog.*` |
-| 联系 | `ContactController` | `pages/ContactForm.tsx` | `contact.*` |
-
 ```
 resources/js/
-├── main.tsx                  # React 入口 + RouteForgeProvider
-├── App.tsx                   # 根组件
-├── router.tsx                # React Router 路由表
-├── components/               # 通用组件
-│   ├── SiteHeader.tsx
-│   ├── SiteFooter.tsx
-│   ├── FeatureCard.tsx
-│   └── ...
-├── pages/                    # 页面级组件
-│   ├── Home.tsx
-│   ├── AboutCompany.tsx
-│   ├── AboutTimeline.tsx
-│   ├── AboutTeam.tsx
-│   ├── ProductsIndex.tsx
-│   ├── ProductsCategory.tsx
-│   ├── ProductsShow.tsx
-│   ├── CatalogIndex.tsx
-│   ├── CatalogShow.tsx
-│   └── ContactForm.tsx
+├── app.jsx                 # 入口：RouteForgeProvider + RouterProvider
+├── forge-options.js        # forge options（CSRF 拦截器）
+├── router.jsx              # React Router（createBrowserRouter，history 模式）
+├── layout/
+│   ├── SiteLayout.jsx      # 前台布局（SiteHeader / SiteFooter + <Outlet />）
+│   └── AdminLayout.jsx     # 管理端布局（登录后懒加载 manage 层级）
+├── pages/                  # 前台三页
+│   ├── HomePage.jsx
+│   ├── CatalogsPage.jsx
+│   └── CatalogPage.jsx
+├── manage/                 # 管理端模块（React.lazy 异步 chunk）
+│   ├── ManageApp.jsx
+│   ├── CatalogList.jsx     # 画册列表管理
+│   └── PageManager.jsx     # 画册页数据管理
+├── components/
+│   ├── CatalogCard.jsx     # 画册卡片（首页/列表复用）
+│   ├── PageFlip.jsx        # 翻页阅读器
+│   ├── PageSheet.jsx       # 单页渲染
+│   ├── SiteHeader.jsx
+│   └── SiteFooter.jsx
+├── support/
+│   ├── api.js              # call() 三层拆包（bodyOf / pageOf / messageOf）
+│   └── forgeLinks.jsx      # ForgeLink 场景封装（level 静态绑定）
 └── types/
-    └── forge.d.ts            # ← forge:types 自动生成
+    └── forge-routes.d.ts   # route:forge:types 自动生成
 ```
 
 ---

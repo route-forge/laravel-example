@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "cda2add6397422fb1a2eb5b9207f1575",
+    "content-hash": "0acfcb9043a0b28151612f1931591db7",
     "packages": [
         {
             "name": "brick/math",
@@ -3258,6 +3258,88 @@
                 "source": "https://github.com/ramsey/uuid/tree/4.9.3"
             },
             "time": "2026-06-18T03:57:49+00:00"
+        },
+        {
+            "name": "route-forge/laravel",
+            "version": "1.4.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/route-forge/route-forge-laravel.git",
+                "reference": "ac9be8af1751811ba29a6fc5452b5164f72f9153"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/route-forge/route-forge-laravel/zipball/ac9be8af1751811ba29a6fc5452b5164f72f9153",
+                "reference": "ac9be8af1751811ba29a6fc5452b5164f72f9153",
+                "shasum": ""
+            },
+            "require": {
+                "illuminate/cache": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/console": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/http": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/routing": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+                "illuminate/view": "^11.0 || ^12.0 || ^13.0",
+                "php": "^8.2"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^9.0 || ^10.0 || ^11.0",
+                "phpunit/phpunit": "^10.5 || ^11.5 || ^12.5 || ^13.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "RouteForge\\Laravel\\ForgeServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "RouteForge\\Laravel\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "阿杰很厉害",
+                    "email": "506907958@qq.com",
+                    "homepage": "https://github.com/xyj2156"
+                }
+            ],
+            "description": "Laravel named routes for SPA frontends: per-tier lazy loading via an HTTP metadata endpoint, an auto-discovery summary, TypeScript type generation, and zero-annotation route export. Backend of the route-forge project.",
+            "homepage": "https://github.com/route-forge/route-forge-laravel",
+            "keywords": [
+                "SPA",
+                "api",
+                "frontend",
+                "inertia",
+                "laravel",
+                "lazy-loading",
+                "metadata",
+                "named-route",
+                "on-demand",
+                "php",
+                "react",
+                "route",
+                "routes",
+                "routing",
+                "single-source-of-truth",
+                "tier",
+                "tiered-routing",
+                "types",
+                "typescript",
+                "vue"
+            ],
+            "support": {
+                "docs": "https://github.com/route-forge/route-forge-laravel/tree/main/.docs",
+                "issues": "https://github.com/route-forge/route-forge-laravel/issues",
+                "source": "https://github.com/route-forge/route-forge-laravel"
+            },
+            "time": "2026-09-02T16:24:55+00:00"
         },
         {
             "name": "symfony/clock",
@@ -8341,7 +8423,7 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.3"
+        "php": "^8.5"
     },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"

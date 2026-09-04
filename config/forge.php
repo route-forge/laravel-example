@@ -73,7 +73,8 @@ return [
                 'middleware' => ['manage'],
             ],
             'load'  => 'lazy',
-            'endpoint_middleware' => ['manage'],
+            // web 组提供会话（$request->user() 依赖 StartSession），manage 做登录 + is_manager 准入
+            'endpoint_middleware' => ['web', 'manage'],
         ],
     ],
 

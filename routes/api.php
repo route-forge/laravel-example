@@ -35,7 +35,7 @@ use Illuminate\Routing\Router;
 | 路由命名空间：公开侧 api.*，管理端 api.manage.*（管理端独占 /manage URI 段，
 | GET index/show 与公开侧语义不同——含草稿——不能同名，见 Manage\CatalogController）。
 |
-| 前端调用：useForgeApi('public')；useForgeApi({ level: 'manage', prefix: 'api.manage.' })
+| 前端调用：useForgeApi('public')；useForgeApi('manage', 'api.manage.')
 */
 
 $this->router->group([], function (Router $r) {

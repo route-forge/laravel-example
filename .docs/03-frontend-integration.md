@@ -2,6 +2,9 @@
 
 > 读完本文你会知道：如何初始化 Vue 插件、如何与 vue-router 配合、`useForgeApi` 怎么按层级发
 > 请求（含懒加载层级）、以及懒加载未就绪时的门闩处理。所有 API 均以 2.2 版真实行为为准。
+>
+> 📌 本分支（main）收录的是 **Vue 版**。React 版（`RouteForgeProvider` / `useForgeApi({ level })` /
+> `ForgeLink`）见 react 分支的同名文档 —— 两篇的结构一一对应，仅框架适配层不同。
 
 ---
 

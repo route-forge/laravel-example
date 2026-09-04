@@ -1,7 +1,15 @@
 <?php
+/**
+ * @var $this RouteFileRegistrar
+ */
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\IndexController;
+use Illuminate\Routing\RouteFileRegistrar;
+use Illuminate\Routing\Router;
 
-Route::get('/', function () {
-    return view('home');
+$this->router->group([
+    'tier' => 'public',
+], function (Router $r) {
+    $r->get('/', IndexController::class)->name('index');
+    $r->fallback(IndexController::class)->name('fallback');
 });

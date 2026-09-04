@@ -13,15 +13,18 @@
 import { createApp } from 'vue';
 import App from './App.vue';
 import 'virtual:uno.css';
-import { createRouteForgePlugin } from '@route-forge/vue';
+import router from '@/route.js';
+import forge from '@/forge.js';
 
 const app = createApp(App);
-const forge = createRouteForgePlugin({});
+app.use(router);
 app.use(forge);
 forge
   .ready()
   .then(function () {
     app.mount('#app');
+    console.log('Route Forge 插件初始化成功');
+    console.log('挂载完成');
   })
   .catch(function () {
     console.error('Route Forge 插件初始化失败');

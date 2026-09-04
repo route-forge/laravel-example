@@ -13,11 +13,6 @@
   <meta name="description" content="route-forge × Laravel × Vue 3 企业画册示例">
   <meta name="theme-color" content="#1668ac">
 
-  {{-- @forgeSummary 放进 <head>、早于 @vite：它输出的是一段一次性 window 访问器脚本
-       （defineProperty + 读后即 delete），必须在前端 bundle 求值前就位。
-       app.js 是 type=module（defer），放在这里才是契约本意，也避免以后有人改成
-       非 defer 脚本时静默失效。 --}}
-  @forgeSummary
   @fonts
   {{-- app.css 在前、app.js 在后：UnoCSS 与 Element Plus 的样式随 JS 依赖图注入，
        因此基线变量先落位，工具类后落位（同特异度下后来者胜） --}}
@@ -28,6 +23,8 @@
 <body class="bg-white text-gray-800 antialiased">
 {{-- #app 内的占位块会在 Vue 挂载时被整体替换，只为避免首屏纯白 --}}
 <div id="app">
+  {{-- @forgeSummary 放这里，只是为了让vue覆盖掉 --}}
+  @forgeSummary
   <style>
     .boot-loading {
       display: flex;

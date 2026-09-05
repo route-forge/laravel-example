@@ -105,11 +105,29 @@ forge.ready().then(() => app.mount('#app'));
 import { createRouter, createWebHistory } from 'vue-router';
 
 const routes = [
-  { path: '/', component: () => import('@/pages/HomePage.vue') },
-  { path: '/catalogs', component: () => import('@/pages/CatalogsPage.vue') },
-  { path: '/catalogs/:slug', component: () => import('@/pages/CatalogPage.vue') },
-  // 管理端：异步 chunk，登录相关路由不进前台 bundle
-  { path: '/admin', component: () => import('@/layout/admin.vue') },
+  {
+    path: '/',
+    component: () => import('@/layout/index.vue'),
+    children: [
+      { path: '', name: 'home', component: () => import('@/pages/home/index.vue') },
+      { path: 'catalogs', name: 'catalogs', component: () => import('@/pages/catalogs/index.vue') },
+      {
+        path: 'catalogs/:slug',
+        name: 'catalog.detail',
+        component: () => import('@/pages/catalogs/detail.vue'),
+      },
+      { path: 'contact', name: 'contact', component: () => import('@/pages/contact/index.vue') },
+      // catch-all：服务端回退路由已经把任意路径送进 SPA，未匹配地址只有 vue-router 能判定
+      {
+        path: ':pathMatch(.*)*',
+        name: 'not-found',
+        component: () => import('@/pages/not-found/index.vue'),
+      },
+    ],
+  },
+  // 管理端：登录页独立于后台布局，其余模块在 /manage 下异步 chunk
+  { path: '/manage/login', name: 'manage.login', component: () => import('@/pages/admin/login.vue') },
+  { path: '/manage', name: 'manage', component: () => import('@/layout/admin.vue') },
 ];
 
 export default createRouter({
@@ -122,18 +140,34 @@ export default createRouter({
 后端配合：`routes/web.php` 保留一条入口 + catch-all 回退，把非 `/api`、非 `/_forge` 的请求全部 落到
 `index.blade.php`，刷新 / 直达深链不 404。
 
-组件里导航永远用路由名，不写 URL 字面量：
+### 两套「路由名」不要混用
+
+本项目里同时存在两组命名路由，各管一件事：
+
+| 名字来源                  | 例子                             | 用途                                 |
+|---------------------------|----------------------------------|--------------------------------------|
+| vue-router 的 `routes`  | `home` / `catalog.detail` / `manage.login` | **页面地址**：跳转、`<router-link>` |
+| route-forge 的 Laravel 名 | `api.catalogs.show`             | **数据端点地址**：`useForgeApi` 取数 |
+
+服务端只有一条入口路由 + catch-all，`/catalogs/company-2026` 这类页面地址 **在 Laravel 路由表里
+不存在**。所以 `route('api.catalogs.show', { slug })` 生成的是 JSON 接口地址
+（`/api/catalogs/company-2026`），拿它做页面跳转会把访客送进一段裸 JSON。组件里的页面导航永远用
+vue-router 的名字：
 
 ```vue
 <script setup>
-const { route } = useForgeRoute();
+import { useRouter } from 'vue-router';
+
 const router = useRouter();
 
 function openCatalog(slug) {
-  router.push(route('api.catalogs.show', { slug }));
+  router.push({ name: 'catalog.detail', params: { slug } }); // 页面 → vue-router 名
 }
 </script>
 ```
+
+`useForgeRoute()` 与 `<ForgeRoute>` 留给「确实要把接口地址暴露给用户」的场景：复制 raw JSON 链接、
+新窗口打开端点看原文。普通的取数不需要它们——`useForgeApi` 内部已按路由名解析端点，见下文。
 
 ## useForgeRoute：响应式 URL 生成
 
@@ -147,8 +181,13 @@ function openCatalog(slug) {
 
 ```vue
 <template>
-  <!-- public 层级 eager 加载，直接可用 -->
-  <router-link :to="route('api.catalogs.show', { slug: item.slug })">{{ item.title }}</router-link>
+  <!-- 生成的是接口地址：用于展示、复制或新窗口打开 raw JSON -->
+  <a :href="route('api.catalogs.show', { slug: item.slug })" target="_blank">接口原文</a>
+
+  <!-- 页面链接用 vue-router 名，见上一节 -->
+  <router-link :to="{ name: 'catalog.detail', params: { slug: item.slug } }">
+    {{ item.title }}
+  </router-link>
 </template>
 ```
 
@@ -179,7 +218,7 @@ const { call } = useForgeApi('public');
 await call('api.catalogs.index');
 
 // 3. 绑定层级 + 前缀：路由名自动拼接 prefix
-const { call } = useForgeApi('manage', 'manage.api.');
+const { call } = useForgeApi('manage', 'api.manage.');
 call('catalogs.index');
 ```
 
@@ -214,15 +253,18 @@ else {
 ```vue
 <template lang="pug">
 div(v-if='levelLoaded')
-  router-link(:to='route("manage.api.catalogs.show", { catalog: id })') 查看
+  //- 取数：按名字解析 manage 层级的端点
+  el-button(:loading='loading', @click='load') 加载统计
+  //- 接口地址：只用于展示 / 复制，不是页面链接
+  code {{ route('api.manage.catalogs.show', { catalog: id }) }}
 div(v-else)
-  | 路由加载中…
+  | 路由明细加载中…
 </template>
 ```
 
 ## TypeScript 类型
 
-后端 `route:forge:types` 生成 `resources/js/types/forge-routes.d.ts` 后，`route()` /
+后端 `route:forge:types` 生成 `resources/js/types/route-forge.d.ts` 后，`route()` /
 `call()` 的路由名与参数被 TS 约束（module augmentation 注入 `ForgeRouteMap`）：
 
 ```ts

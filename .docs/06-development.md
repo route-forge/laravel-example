@@ -81,7 +81,7 @@ composer dev
 3. 重新生成前端类型：
 
 ```bash
-php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
+php artisan route:forge:types --out=resources/js/types/route-forge.d.ts
 ```
 
 ### 跑测试
@@ -111,7 +111,7 @@ npm run format:check   # CI 用
 ### PHP 规范
 
 - 遵循 Laravel 默认风格，由 Pint 强制执行
-- 命名路由统一小写 + 点分隔：`api.catalogs.show`、`manage.api.pages.update`
+- 命名路由统一小写 + 点分隔：`api.catalogs.show`、`api.manage.pages.update`
 - `->tier()` 宏必须 **后置链式**
   （先定义路由再归级），见 [02 · 路由归级](02-backend-integration.md#路由归级的三条通道)
 
@@ -134,9 +134,9 @@ npm run format:check   # CI 用
 | 场景     | 格式示例                                   | 说明                           |
 |----------|--------------------------------------------|--------------------------------|
 | 公开接口 | `api.catalogs.index` / `api.catalogs.show` | scope = `api`                  |
-| 管理接口 | `manage.api.catalogs.store`                | scope = `manage` + 组内 `api.` |
-| 嵌套资源 | `manage.api.catalogs.pages.reorder`        | 子资源动作用点继续下探         |
-| 例外放行 | `manage.login`（显式 `->tier('public')`）  | 登录登出要在未登录时可用       |
+| 管理接口 | `api.manage.catalogs.store`                | 组属性 `'as' => 'api.manage.'` |
+| 嵌套资源 | `api.manage.catalogs.pages.reorder`        | 子资源动作用点继续下探         |
+| 例外放行 | `api.auth.login`（显式 `->tier('public')`） | 登录要在未登录时可用；登出 `api.manage.logout` 留在 manage 组内 |
 
 禁止：大写、下划线、无意义数字后缀。
 

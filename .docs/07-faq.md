@@ -112,7 +112,7 @@ router.push(route('api.catalogs.show', { slug }));
 每次路由变更后重新生成：
 
 ```bash
-php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
+php artisan route:forge:types --out=resources/js/types/route-forge.d.ts
 ```
 
 还不生效则检查：
@@ -208,7 +208,7 @@ forge 摘要与层级端点是按设计分级公开的：
 
 | 检查项                               | 怎么查                                 |
 |--------------------------------------|----------------------------------------|
-| `forge-routes.d.ts` 是否存在且最新   | 重跑 `route:forge:types --out=...`     |
+| `route-forge.d.ts` 是否存在且最新   | 重跑 `route:forge:types --out=...`     |
 | 是否在 include 范围                  | 检查 `jsconfig.json` / `tsconfig.json` |
 | 是否重跑了类型命令但没重启 TS Server | Restart TS Server                      |
 

@@ -91,7 +91,7 @@ router.push(route('api.catalogs.show', { slug: 'company-2026' }));
 |-------------------------------|------------------------------------------------------------------------------------------|------------------------------------------------------|
 | **Laravel 只出一个 Blade 壳** | 所有 URL 都落到 `resources/views/index.blade.php`，它只注入 forge 摘要 + CSRF + 挂载 Vue | 页面路由归前端，后端不再为每个栏目写视图             |
 | **页面路由归 vue-router**     | `history` 模式 + Laravel 回退路由兜底，刷新不 404                                        | 前后端分离的标准做法                                 |
-| **数据全部走 JSON API**       | 公开数据 `/api/*`，管理端 `/manage/api/*`                                                | 数据契约清晰，前后端可并行开发                       |
+| **数据全部走 JSON API**       | 公开数据 `/api/*`，管理端 `/api/manage/*`                                                | 数据契约清晰，前后端可并行开发                       |
 | **路由按层级归类**            | `public`（eager）/ `manage`（lazy + 受保护）                                             | 首屏只带公开路由；管理端路由名在登录前不可见、不可调 |
 | **URL 生成与组件映射解耦**    | vue-router 管「URL → 组件」，route-forge 管「路由名 → URL」                              | 改后端 URI 不用动前端路由表，只改类型重新生成        |
 
@@ -130,14 +130,14 @@ app.mount('#app') → vue-router 接管 URL
 用户看到画册详情（Vue 渲染 + 类型安全导航与请求）
 ```
 
-管理端（`/admin`）多一步懒加载：
+管理端（`/manage`）多一步懒加载：
 
 ```
 登录成功 → useForgeApi('manage') 首次调用
     │  自动请求 GET /_forge/routes/manage（受 manage 中间件保护）
     │  拿到 manage 层级路由明细 → 构建管理端路由表
     ▼
-管理端组件凭 manage.api.* 路由名调接口
+管理端组件凭 api.manage.* 路由名调接口
     未登录时连「后台有哪些路由」都拿不到 —— 这是层级保护的本意
 ```
 
@@ -173,7 +173,7 @@ route-forge 不预设固定层级，层级完全由 `config/forge.php` 自定义
 | **forge.ready()**              | 摘要加载解析完成后的 Promise，必须在 mount 之前 await                             |
 | **route('name', params)**      | 由 `@route-forge/core` 实现的 URL 生成函数                                        |
 | **useForgeApi(level)**         | `@route-forge/vue` 组合式 API，按层级发请求，懒加载层级自动拉明细                 |
-| **类型下发**                   | `route:forge:types` 生成 `forge-routes.d.ts`，让 `route()` 的参数被 TS 约束       |
+| **类型下发**                   | `route:forge:types` 生成 `route-forge.d.ts`，让 `route()` 的参数被 TS 约束       |
 | **别名 (Alias)**               | 路由改名过渡手段：旧名继续可用，指向新路由（宏 `->forgeAlias()` 或 config 声明）  |
 
 ---

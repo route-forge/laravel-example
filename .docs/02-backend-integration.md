@@ -140,12 +140,12 @@ Route::group(['tier' => 'public'], function () {
 | 路由名                                                | 方法       | URI                                            | 说明                      |
 |-------------------------------------------------------|------------|------------------------------------------------|---------------------------|
 | `manage.login` / `manage.logout`                      | POST       | `/manage/login` / `/manage/logout`             | 登录登出（显式归 public） |
-| `manage.api.site.update`                              | PUT        | `/manage/api/site`                             | 基础资料维护              |
-| `manage.api.categories.*`                             | CRUD       | `/manage/api/categories`                       | 分类管理                  |
-| `manage.api.catalogs.index/store/show/update/destroy` | CRUD       | `/manage/api/catalogs`                         | 画册管理                  |
-| `manage.api.catalogs.pages.index/store`               | GET/POST   | `/manage/api/catalogs/{catalog}/pages`         | 画册页列表/新增           |
-| `manage.api.catalogs.pages.reorder`                   | POST       | `/manage/api/catalogs/{catalog}/pages/reorder` | 页排序                    |
-| `manage.api.pages.update/destroy`                     | PUT/DELETE | `/manage/api/pages/{page}`                     | 页编辑/删除               |
+| `api.manage.site.update`                              | PUT        | `/api/manage/site`                             | 基础资料维护              |
+| `api.manage.categories.*`                             | CRUD       | `/api/manage/categories`                       | 分类管理                  |
+| `api.manage.catalogs.index/store/show/update/destroy` | CRUD       | `/api/manage/catalogs`                         | 画册管理                  |
+| `api.manage.catalogs.pages.index/store`               | GET/POST   | `/api/manage/catalogs/{catalog}/pages`         | 画册页列表/新增           |
+| `api.manage.catalogs.pages.reorder`                   | POST       | `/api/manage/catalogs/{catalog}/pages/reorder` | 页排序                    |
+| `api.manage.pages.update/destroy`                     | PUT/DELETE | `/api/manage/pages/{page}`                     | 页编辑/删除               |
 
 命名规范：`{scope}.{resource}.{action}`，点分隔、全小写。forge 摘要会收录全部命名路由并按 层级归类，前端凭名字调用。
 
@@ -187,7 +187,7 @@ Blade 注入之外的 HTTP 通道，前缀默认 `/_forge/routes`（`FORGE_ENDPO
 ## 生成 TypeScript 类型
 
 ```bash
-php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
+php artisan route:forge:types --out=resources/js/types/route-forge.d.ts
 ```
 
 | 选项       | 说明                                  |

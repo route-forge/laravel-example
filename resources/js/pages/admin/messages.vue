@@ -1,14 +1,16 @@
 <script setup>
 /**
- * 留言管理：状态筛选 + 分页表格 + 查看详情 + 处理（status 流转）。
+ * 留言管理：keyword 搜索 + 状态筛选 + 分页表格 + 查看详情 + 处理（status 流转，可退回未读）。
  *
- * 接口契约：messages.index（?status=&page=）、messages.update（params.message，body { status }）。
+ * 接口契约：messages.index（?keyword=&status=&page=）、messages.update（params.message，body { status }）。
  * 状态机由后端约束：离开 new 记 handled_at，退回 new 清空。
  */
 import { onMounted, reactive, ref } from 'vue';
+import { useRoute } from 'vue-router';
 import { useForgeApi } from '@route-forge/vue';
 import { pageOf, messageOf } from '@/support/api.js';
 
+const route = useRoute();
 const { call } = useForgeApi('manage', 'api.manage');
 
 const STATUS_OPTIONS = [
@@ -18,7 +20,8 @@ const STATUS_OPTIONS = [
   { value: 'archived', label: '已归档', tag: 'warning' },
 ];
 
-const filters = reactive({ status: '' });
+// 从路由 query 预置筛选（仪表盘「未读留言」卡跳转过来时带 status）
+const filters = reactive({ keyword: '', status: route.query.status ?? '' });
 const items = ref([]);
 const meta = ref({ current_page: 1, last_page: 1, total: 0 });
 const loading = ref(false);
@@ -33,7 +36,7 @@ async function load(page = 1) {
   loading.value = true;
   try {
     const res = await call('messages.index', {
-      query: { page, status: filters.status || undefined },
+      query: { page, keyword: filters.keyword || undefined, status: filters.status || undefined },
     });
 
     if (res.error) {
@@ -76,6 +79,13 @@ onMounted(() => load());
 <template lang="pug">
 div
   div(class='flex items-center gap-3')
+    el-input(
+      v-model='filters.keyword',
+      placeholder='按来信人 / 邮箱 / 主题 / 内容搜索',
+      clearable,
+      class='!w-64',
+      @keyup.enter='load(1)'
+    )
     el-select(v-model='filters.status', placeholder='全部状态', clearable, class='!w-36')
       el-option(
         v-for='option in STATUS_OPTIONS',
@@ -102,17 +112,23 @@ div
     el-table-column(prop='created_at', label='时间', width='110')
       template(#default='{ row }')
         span(class='text-xs text-gray-400') {{ (row.created_at ?? '').slice(0, 10) }}
-    el-table-column(label='操作', width='180', fixed='right')
+    el-table-column(label='操作', width='240', fixed='right')
       template(#default='{ row }')
         el-button(link, type='primary', @click='openDetail(row)') 查看
         el-button(v-if='row.status === "new"', link, type='primary', @click='mark(row, "read")') 标已读
         el-button(
-          v-if='row.status !== "replied" && row.status !== "archived"',
+          v-if='row.status === "new" || row.status === "read"',
           link,
           type='success',
           @click='mark(row, "replied")'
         ) 已回复
-        el-button(link, type='warning', @click='mark(row, "archived")') 归档
+        el-button(v-if='row.status !== "new"', link, type='info', @click='mark(row, "new")') 退回未读
+        el-button(
+          v-if='row.status !== "archived"',
+          link,
+          type='warning',
+          @click='mark(row, "archived")'
+        ) 归档
 
   el-pagination(
     class='mt-4 justify-end',
@@ -142,7 +158,17 @@ div
       el-divider
       p(class='whitespace-pre-wrap text-sm leading-6 text-gray-700') {{ detail.row.message }}
     template(#footer)
-      el-button(@click='mark(detail.row, "read")') 标为已读
-      el-button(type='success', @click='mark(detail.row, "replied")') 标为已回复
+      el-button(v-if='detail.row.status === "new"', @click='mark(detail.row, "read")') 标为已读
+      el-button(
+        v-if='detail.row.status === "new" || detail.row.status === "read"',
+        type='success',
+        @click='mark(detail.row, "replied")'
+      ) 标为已回复
+      el-button(v-if='detail.row.status !== "new"', type='info', @click='mark(detail.row, "new")') 退回未读
+      el-button(
+        v-if='detail.row.status !== "archived"',
+        type='warning',
+        @click='mark(detail.row, "archived")'
+      ) 归档
       el-button(@click='detail.visible = false') 关闭
 </template>

@@ -19,7 +19,7 @@ import {
   ChatDotRound,
   Setting,
 } from '@element-plus/icons-vue';
-import { bodyOf, messageOf } from '@/support/api.js';
+import { bodyOf } from '@/support/api.js';
 
 const route = useRoute();
 const router = useRouter();
@@ -33,8 +33,8 @@ onMounted(async () => {
   const res = await call('bootstrap').catch((error) => ({ error }));
 
   if (res.error) {
+    // 401 提示与跳转由 forge.js 的全局拦截器统一负责，这里只把界面拦在门外
     state.value = 'deny';
-    ElMessage.warning(messageOf(res.error) || '请先登录管理端');
     router.replace({ name: 'manage.login' });
     return;
   }

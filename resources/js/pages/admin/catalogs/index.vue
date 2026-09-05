@@ -10,10 +10,11 @@
  *   categories.index GET    分类下拉数据源（含草稿计数）
  */
 import { onMounted, reactive, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useForgeApi } from '@route-forge/vue';
 import { bodyOf, pageOf, messageOf } from '@/support/api.js';
 
+const route = useRoute();
 const router = useRouter();
 const { call } = useForgeApi('manage', 'api.manage');
 
@@ -22,7 +23,8 @@ const STATUS_OPTIONS = [
   { value: 'published', label: '已发布' },
 ];
 
-const filters = reactive({ keyword: '', status: '' });
+// 从路由 query 预置筛选（仪表盘「已发布」卡跳转过来时带 status）
+const filters = reactive({ keyword: '', status: route.query.status ?? '' });
 const items = ref([]);
 const meta = ref({ current_page: 1, last_page: 1, total: 0 });
 const categories = ref([]);

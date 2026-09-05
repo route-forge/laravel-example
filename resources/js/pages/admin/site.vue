@@ -42,7 +42,7 @@ async function load() {
     return;
   }
 
-  Object.assign(form, emptyForm(), bodyOf(res) ?? {});
+  Object.assign(form, emptyForm(), bodyOf(res.data) ?? {});
 }
 
 function save() {
@@ -58,7 +58,7 @@ function save() {
         return;
       }
 
-      Object.assign(form, emptyForm(), bodyOf(res) ?? {});
+      Object.assign(form, emptyForm(), bodyOf(res.data) ?? {});
       ElMessage.success('基础资料已保存');
     } finally {
       saving.value = false;

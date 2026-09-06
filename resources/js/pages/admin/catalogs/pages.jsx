@@ -33,7 +33,7 @@ export default function CatalogPagesPage() {
   const id = Number(catalogId);
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
-  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage' });
 
   const [catalog, setCatalog] = useState(null);
   const [pages, setPages] = useState([]);

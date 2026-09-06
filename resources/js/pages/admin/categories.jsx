@@ -13,7 +13,7 @@ import { SLUG_PATTERN } from '@/support/enums.js';
  */
 export default function CategoriesPage() {
   const { message, modal } = App.useApp();
-  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage' });
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);

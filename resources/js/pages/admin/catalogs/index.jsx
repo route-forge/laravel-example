@@ -44,7 +44,7 @@ export default function CatalogsPage() {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const [searchParams] = useSearchParams();
-  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage' });
 
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState({ current_page: 1, per_page: 10, total: 0 });

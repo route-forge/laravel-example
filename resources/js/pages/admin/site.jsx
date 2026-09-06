@@ -30,7 +30,7 @@ const fieldsOf = (result) => {
 export default function SitePage() {
   const { message } = App.useApp();
   const publicApi = useForgeApi({ level: 'public' });
-  const manageApi = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const manageApi = useForgeApi({ level: 'manage', prefix: 'api.manage' });
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

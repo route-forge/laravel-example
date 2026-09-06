@@ -13,7 +13,7 @@ const EMPTY_STATS = { catalogs: 0, published: 0, pages: 0, messages: 0, unread: 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage' });
 
   const [user, setUser] = useState(null);
   const [stats, setStats] = useState(EMPTY_STATS);

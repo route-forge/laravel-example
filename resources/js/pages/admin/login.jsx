@@ -15,7 +15,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const publicApi = useForgeApi({ level: 'public' });
-  const manageApi = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const manageApi = useForgeApi({ level: 'manage', prefix: 'api.manage' });
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 

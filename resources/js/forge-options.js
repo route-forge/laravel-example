@@ -8,8 +8,9 @@ import { router } from '@/router.jsx';
  * 摘要来源无需在此指定：Blade 里的 @forgeSummary 已在 window.__ROUTE_FORGE__ 注入一次性摘要，
  * core 会优先读它；manage 层级是 lazy，首次用到时由 core 去 GET /_forge/routes/manage 补明细。
  *
- * interceptors 的每个键只描述「一个」拦截器，写法三选一：函数 / [resolve, reject] 元组 /
- * { resolve, reject } 对象（见 SPEC）。
+ * interceptors 的每个键在 core 2.2.1（当前安装版）是「列表语义」，故这里用数组包裹；
+ * core 3.0.0 起「每键 = 单个拦截器」（函数 / [resolve,reject] 元组 / {resolve,reject} 对象三选一），
+ * 升级后须去掉外层数组，改回每键单个拦截器的写法。
  */
 
 /** 从 document.cookie 读指定 cookie 值（Laravel 会把 CSRF 以 URL 编码放进 XSRF-TOKEN）。 */
@@ -28,25 +29,29 @@ export default {
     // 请求前：实时读 cookie 注入 X-XSRF-TOKEN。
     // ⚠ 不能像 vue 那样从响应头轮换热更新 —— 默认 fetch 适配层拿不到 Set-Cookie（浏览器禁止 JS 读），
     //   而浏览器本身会自动维护 XSRF-TOKEN cookie，故每次请求现读现用最可靠。
-    request: (config) => {
-      const csrf = getCookie('XSRF-TOKEN');
-      if (csrf) {
-        config.headers = { ...config.headers, 'X-XSRF-TOKEN': csrf };
+    request: [
+      (config) => {
+        const csrf = getCookie('XSRF-TOKEN');
+        if (csrf) {
+          config.headers = { ...config.headers, 'X-XSRF-TOKEN': csrf };
+        }
+        return config;
       }
-      return config;
-    },
+    ],
 
     // 响应：只做 401 全局兜底 —— 会话过期后任何一次 manage 调用都会到这里，
     // 统一提示并送回登录页；登录页自身不接管（防循环跳转）。
-    response: {
-      resolve: (response) => response,
-      reject: (error) => {
-        if (statusOf(error) === 401 && window.location.pathname !== '/manage/login') {
-          message.warning('登录已过期，请重新登录');
-          router.navigate('/manage/login', { replace: true });
-        }
-        return Promise.reject(error);
-      },
-    },
-  },
+    response:[
+      [
+        (response) => response,
+        (error) => {
+          if (statusOf(error) === 401 && window.location.pathname !== '/manage/login') {
+            message.warning('登录已过期，请重新登录');
+            router.navigate('/manage/login', { replace: true });
+          }
+          return Promise.reject(error);
+        },
+      ],
+    ]
+  }
 };

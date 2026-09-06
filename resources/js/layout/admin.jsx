@@ -44,7 +44,7 @@ export default function ManageLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { message } = App.useApp();
-  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage.' });
+  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage' });
 
   // 'checking' → 'ok'；deny 时已完成跳转
   const [state, setState] = useState('checking');

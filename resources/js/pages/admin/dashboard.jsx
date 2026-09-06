@@ -1,37 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router';
-import { App } from 'antd';
-import { useForgeApi } from '@route-forge/react';
-import { bodyOf, messageOf } from '@/support/api.js';
+import { useMemo } from 'react';
+import { useNavigate, useOutletContext } from 'react-router';
 
 const EMPTY_STATS = { catalogs: 0, published: 0, pages: 0, messages: 0, unread: 0 };
 
 /**
- * 仪表盘：bootstrap 一次取回身份 + 统计；统计卡可点击直达对应管理页。
- * 「已发布 / 未读留言」卡顺带用 query 预置筛选条件（列表页读取 route 的 searchParams）。
+ * 仪表盘：身份 + 统计直接取自布局下发的 bootstrap 结果（useOutletContext），
+ * 不再自己发请求 —— 布局挂载时已调过一次 bootstrap（准入门闩），这里复用即可。
+ * 统计卡可点击直达对应管理页，「已发布 / 未读留言」卡顺带用 query 预置筛选条件。
  */
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { message } = App.useApp();
-  const { call } = useForgeApi({ level: 'manage', prefix: 'api.manage' });
+  const { bootstrap } = useOutletContext();
 
-  const [user, setUser] = useState(null);
-  const [stats, setStats] = useState(EMPTY_STATS);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      const res = await call('bootstrap').catch((error) => ({ error }));
-      setLoading(false);
-      if (res.error) {
-        message.error(messageOf(res.error));
-        return;
-      }
-      const body = bodyOf(res) ?? {};
-      setUser(body.user ?? null);
-      setStats({ ...EMPTY_STATS, ...body.stats });
-    })();
-  }, [call, message]);
+  const user = bootstrap?.user ?? null;
+  const stats = { ...EMPTY_STATS, ...bootstrap?.stats };
 
   const cards = useMemo(
     () => [
@@ -47,9 +29,7 @@ export default function DashboardPage() {
   return (
     <div>
       <p className="text-xs tracking-wide text-gray-400 uppercase">Dashboard</p>
-      <h1 className="mt-1 text-xl font-semibold text-gray-900">
-        {loading ? '加载中…' : `你好，${user?.name ?? '管理员'}`}
-      </h1>
+      <h1 className="mt-1 text-xl font-semibold text-gray-900">你好，{user?.name ?? '管理员'}</h1>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3 xl:grid-cols-5">
         {cards.map((card) => (
@@ -59,7 +39,7 @@ export default function DashboardPage() {
             className="cursor-pointer rounded-xl border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
           >
             <p className="text-xs text-gray-500">{card.label}</p>
-            <p className="mt-2 text-3xl font-semibold text-gray-900">{loading ? '—' : card.value}</p>
+            <p className="mt-2 text-3xl font-semibold text-gray-900">{card.value}</p>
             {card.hint ? <p className="mt-1 text-xs text-gray-400">{card.hint}</p> : null}
           </div>
         ))}

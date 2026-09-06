@@ -39,6 +39,9 @@ const TITLES = [
  * 准入门闩：进入布局先探测 bootstrap —— 401 说明未登录，送回登录页；
  * 探测期间整屏 loading，绝不先渲染后台内容（避免未登录闪现框架）。
  * 401 的提示与跳转由 forge-options.js 的全局拦截器统一负责，这里只把界面拦在门外。
+ *
+ * bootstrap 的结果经 <Outlet context> 下发：布局与仪表盘要的是同一份数据
+ * （身份 + 统计），各自调一次就是重复请求，子页面用 useOutletContext 取用即可。
  */
 export default function ManageLayout() {
   const location = useLocation();
@@ -48,7 +51,7 @@ export default function ManageLayout() {
 
   // 'checking' → 'ok'；deny 时已完成跳转
   const [state, setState] = useState('checking');
-  const [user, setUser] = useState(null);
+  const [bootstrap, setBootstrap] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -60,13 +63,15 @@ export default function ManageLayout() {
         navigate('/manage/login', { replace: true });
         return;
       }
-      setUser(bodyOf(res)?.user ?? null);
+      setBootstrap(bodyOf(res));
       setState('ok');
     })();
     return () => {
       alive = false;
     };
   }, [call, navigate]);
+
+  const user = bootstrap?.user ?? null;
 
   const title = useMemo(
     () => TITLES.find(([prefix]) => location.pathname.startsWith(prefix))?.[1] ?? '管理端',
@@ -122,7 +127,7 @@ export default function ManageLayout() {
             <h2 className="text-sm font-semibold text-gray-700">{title}</h2>
           </div>
           <Content className="min-h-0 flex-1 overflow-y-auto bg-gray-100 p-6">
-            <Outlet />
+            <Outlet context={{ bootstrap }} />
           </Content>
         </Layout>
       </Layout>

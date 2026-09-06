@@ -189,6 +189,8 @@ console.log(forge.levelLoaded);
 | 9  | 深链刷新 404                               | React Router history 模式直达失败 | 确认 `routes/web.php` 的 catch-all 回退把请求落到 `index.blade.php`               |
 | 10 | CSRF 校验失败（419）                       | 管理端 PUT/POST 被拒              | 确认 forge-options.js 的 XSRF 拦截器生效（token 会随会话轮换）                    |
 | 11 | level 在运行期被动态计算                   | useForgeRoute 抛 TypeError        | level 是静态快照契约：换层级请在新组件里另行调用                                   |
+| 12 | Blade 壳缺 Fast Refresh preamble           | dev 白屏：`can't detect preamble`（报错指向某 JSX 文件尾），`vite build` 却全绿 | plugin-react 只往 Vite 处理的 index.html 注入，本项目须在 `index.blade.php` 自行补一段（仅 dev，见 [05 §3](05-frontend-tooling.md#3-vitejsplugin-react)） |
+| 13 | `manage.endpoint_middleware` 漏 `web`      | 登录成功却永远进不去后台（明细端点恒 401 → 踢回登录页死循环） | 配成 `['web', 'manage']`：web 提供 StartSession，否则登录态也解析不出用户（见 [01](01-architecture.md) 端点保护） |
 
 ---
 

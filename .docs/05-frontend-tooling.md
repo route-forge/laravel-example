@@ -11,7 +11,7 @@
 - [Vite 插件链详解](#vite-插件链详解)
 - [UnoCSS 原子化 CSS](#unocss-原子化-css)
 - [JSX 模板约定](#jsx-模板约定)
-- [Ant Design 按需引入](#ant-design-按需引入)
+- [Ant Design 按需与样式注入](#ant-design-按需与样式注入)
 - [CSS 注入顺序陷阱](#css-注入顺序陷阱)
 - [唯一 Blade 壳下的样式分层](#唯一-blade-壳下的样式分层)
 
@@ -20,21 +20,25 @@
 ## 整体架构图
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                         vite.config.js                            │
-│                                                                   │
-│  ┌─────────┐  ┌────────┐  ┌─────────┐  ┌──────────────────────┐  │
-│  │ Laravel │→ │ UnoCSS │→ │  React  │→ │ @ant-design/vite-    │  │
-│  │ plugin  │  │        │  │ plugin  │  │ plugin（antd 按需）  │  │
-│  └─────────┘  └────────┘  └─────────┘  └──────────────────────┘  │
-│       │             │           │                │                 │
-│       ▼             ▼           ▼                ▼                 │
-│  ┌────────┐  ┌──────────────┐ ┌────────────┐ ┌─────────────────┐ │
-│  │ Blade  │  │ virtual:uno  │ │ JSX/Fast   │ │ antd 样式按需   │ │
-│  │ 热更新  │  │ .css        │ │ Refresh    │ │ 优化            │ │
-│  └────────┘  └──────────────┘ └────────────┘ └─────────────────┘ │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                       vite.config.js                      │
+│                                                           │
+│   ┌─────────┐   ┌────────┐   ┌──────────┐                │
+│   │ Laravel │ → │ UnoCSS │ → │  React   │                │
+│   │ plugin  │   │        │   │  plugin  │                │
+│   └─────────┘   └────────┘   └──────────┘                │
+│        │            │             │                       │
+│        ▼            ▼             ▼                       │
+│   ┌────────┐  ┌──────────────┐ ┌──────────────────────┐  │
+│   │ Blade  │  │ virtual:uno  │ │ JSX/Fast Refresh     │  │
+│   │ 热更新  │  │ .css         │ │ （preamble 由 Blade  │  │
+│   └────────┘  └──────────────┘ │  壳手工注入，见 §3） │  │
+│                                └──────────────────────┘  │
+└──────────────────────────────────────────────────────────┘
 ```
+
+> Ant Design v5/v6 是 CSS-in-JS + ESM：组件样式随渲染按需注入、tree-shake 天然生效，
+> **不需要**按需引入插件（社区偶见的 `@ant-design/vite-plugin` 在 npm 上并不存在）。
 
 ## Vite 插件链详解
 
@@ -68,14 +72,36 @@ react()
 ```
 
 - **作用**：编译 JSX、启用 Fast Refresh（组件级热替换，保留 state）
+- ⚠ **Blade 壳必须手工注入 preamble**：plugin-react 给每个 JSX 模块尾部附加
+  `if (!window.$RefreshReg$) throw new Error("@vitejs/plugin-react can't detect preamble…")`，
+  而设置该全局的 preamble 只由 Vite 处理 `index.html` 时注入。本项目唯一的 HTML 是
+  `resources/views/index.blade.php`（`@vite` 手工出 script 标签），Vite 插不上手 →
+  **dev 下任意 JSX 模块一执行就白屏**（生产 build 不含该段，`vite build` 测不出来）。
+  对策是在 `@vite` 之前、仅当 `public/hot` 存在时注入与插件 `preambleCode` 一致的模块脚本，
+  dev 源地址取自 hot 文件：
 
-### 4. @ant-design/vite-plugin
-
-```js
-AntdPlugin()
+```blade
+@if (file_exists(public_path('hot')))
+  @php $reactRefreshEntry = rtrim(file_get_contents(public_path('hot')), "\r\n") . '/@react-refresh'; @endphp
+  <script type="module">
+    import { injectIntoGlobalHook } from "{{ $reactRefreshEntry }}";
+    injectIntoGlobalHook(window);
+    window.$RefreshReg$ = () => {};
+    window.$RefreshSig$ = () => (type) => type;
+  </script>
+@endif
 ```
 
-- **作用**：Ant Design 按需引入优化 —— 组件与样式的 import 自动瘦身，产物只含用到的部分
+### 4. Ant Design：无需按需插件
+
+```bash
+pnpm add antd @ant-design/icons
+```
+
+- antd v5/v6 是 **CSS-in-JS**：组件样式在渲染时按需生成注入，产物天然只含用到的部分，
+  不需要 `styleImport`/`babel-plugin-import` 那类旧机制，npm 上也没有 `@ant-design/vite-plugin`
+- 主色、中文 locale 经 `<ConfigProvider theme token / locale>` 下发（见 `app.jsx`）
+- 与 UnoCSS 的先后顺序由 `app.jsx` 的 import 顺序保证（见下文「CSS 注入顺序陷阱」）
 
 ## UnoCSS 原子化 CSS
 
@@ -169,25 +195,25 @@ shortcuts 是「组件级」的原子类组合 —— 一次写好，多处复�
 2. shortcuts（复用组合）
 3. CSS Modules / 内联 style（仅组件私有动态样式）
 
-## Ant Design 按需引入
+## Ant Design 按需与样式注入
 
-### 为什么不用全量引入
+### 为什么不需要任何按需插件
 
-全量引入（`import 'antd/dist/reset.css'` + 全量 import）会把整个组件库打进产物。按需引入让
-最终产物只包含你用到的组件。
+antd v5/v6 用 CSS-in-JS（`@ant-design/cssinjs`）：组件样式在**渲染时按需生成并注入**，
+JS 侧又是标准 ESM，未 import 的组件由 Vite/Rolldown 直接 tree-shake 掉。所以既不需要
+`babel-plugin-import`，也没有可装的 `@ant-design/vite-plugin`（npm 上不存在）。
 
-### 按需引入配置
+本项目唯一静态引入的是全局 reset：
 
-```js
-// vite.config.js
-import AntdPlugin from '@ant-design/vite-plugin';
-
-export default defineConfig({
-  plugins: [laravel(...), UnoCSS(), react(), AntdPlugin()],
-});
+```jsx
+import 'antd/dist/reset.css';   // app.jsx 第一行，见「CSS 注入顺序陷阱」
 ```
 
-`@ant-design/vite-plugin` 自动处理组件与样式的按需 import。
+主色与中文由 `<ConfigProvider theme={{ token: { colorPrimary } }} locale={zhCN}>` 下发；
+`message` / `modal` 要用 `<App>` + `App.useApp()` 取，静态方法会脱离这份上下文。
+
+> dev 下 Fast Refresh 的 preamble 注入要求见上文「Vite 插件链详解 §3」——那是本项目
+> Blade 壳特有的坑，`vite build` 验证不到。
 
 ### 图标显式引入
 

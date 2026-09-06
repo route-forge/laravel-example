@@ -19,6 +19,24 @@
        非 defer 脚本时静默失效。 --}}
   @forgeSummary
   @fonts
+  {{--
+    React Fast Refresh preamble（仅 dev）：@vitejs/plugin-react 会给每个 JSX 模块尾部附加
+    `if (!window.$RefreshReg$) throw new Error("...can't detect preamble...")` 校验，而设置
+    这两个全局的注入只发生在 Vite 亲自处理 index.html 时。本项目的 HTML 是 Blade 壳（前后端
+    分离的唯一入口），Vite 的 transformIndexHtml 轮不到 → 不补这段，dev 下任意 JSX 模块一执行
+    就抛错白屏（报错位置指向该模块文件尾）。片段与 plugin-react v6 内部 preambleCode 逐字一致；
+    dev 源地址取自 public/hot，构建产物没有该文件，故生产环境整体不进。必须排在 app.jsx 之前
+    （module 脚本按文档顺序求值）。
+  --}}
+  @if (file_exists(public_path('hot')))
+    @php $reactRefreshEntry = rtrim(file_get_contents(public_path('hot')), "\r\n") . '/@react-refresh'; @endphp
+    <script type="module">
+      import { injectIntoGlobalHook } from "{{ $reactRefreshEntry }}";
+      injectIntoGlobalHook(window);
+      window.$RefreshReg$ = () => {};
+      window.$RefreshSig$ = () => (type) => type;
+    </script>
+  @endif
   {{-- app.css 在前、app.jsx 在后：UnoCSS 工具类与 Ant Design 的组件样式随 JS 依赖图注入，
        因此基线变量先落位，工具类后落位（同特异度下后来者胜） --}}
   @vite(['resources/css/app.css', 'resources/js/app.jsx'])

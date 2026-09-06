@@ -148,11 +148,11 @@ composer test
 | React                 | ^19      | UI 框架                               |
 | **@route-forge/core** | **^2.2** | **route() 核心 + HTTP 适配 + 类型**   |
 | **@route-forge/react**| **^2.2** | **React Provider + Hooks + 组件**     |
-| React Router          | ^7       | SPA 页面路由（history 模式）          |
+| React Router          | ^8       | SPA 页面路由（history 模式）          |
 | Vite                  | ^8.2     | 构建工具                              |
-| UnoCSS                | ^66.9    | 原子化 CSS（`presetUno`）             |
-| Ant Design            | ^5.x     | UI 组件库（按需引入）                 |
-| @ant-design/icons     | ^5.x     | 图标库（显式引入）                    |
+| UnoCSS                | ^66.10   | 原子化 CSS（`presetWind3`）           |
+| Ant Design            | ^6       | UI 组件库（CSS-in-JS 按需注入）       |
+| @ant-design/icons     | ^6       | 图标库（显式引入）                    |
 
 ## route-forge 在本项目中的用法
 
@@ -223,7 +223,7 @@ php artisan route:forge:types --out=resources/js/types/forge-routes.d.ts
 | 02   | [后端接入：route-forge/laravel](.docs/02-backend-integration.md)        | PHP 开发者    | levels 配置、tier 归级、`@forgeSummary`、端点体系、类型生成            |
 | 03   | [前端接入：@route-forge/react](.docs/03-frontend-integration.md)        | 前端开发者    | Provider 初始化、React Router 集成、`useForgeApi`、懒加载、错误处理    |
 | 04   | [企业画册：栏目结构与内容模型](.docs/04-catalog-structure.md)           | 产品 / 全栈   | 前台三页 + 管理端四块、路由表规划、数据模型、字段契约                  |
-| 05   | [前端工程化：UnoCSS + JSX + Ant Design](.docs/05-frontend-tooling.md)   | 前端开发者    | Vite 插件链、按需引入、JSX 约定、样式分层                              |
+| 05   | [前端工程化：UnoCSS + JSX + Ant Design](.docs/05-frontend-tooling.md)   | 前端开发者    | Vite 插件链、Blade 壳 preamble、JSX 约定、样式分层                     |
 | 06   | [开发指南](.docs/06-development.md)                                     | 贡献者        | 本地环境、代码规范、调试技巧、常见坑                                   |
 | 07   | [FAQ](.docs/07-faq.md)                                                  | 所有人        | 懒加载、类型不更新、别名、与 Laravel 原生 route() 的关系、故障排查     |
 

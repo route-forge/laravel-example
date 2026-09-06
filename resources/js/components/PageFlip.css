@@ -1,0 +1,129 @@
+/*
+ * 翻页阅读器样式（移植自 vue 分支 PageFlip.vue 的 scoped style）。
+ * 与 vue 的唯一差异：Transition mode="out-in" 的双向过渡改为「入场方向感动画」——
+ * 换跨时 spread 节点带 key 重挂载，播放 flip-in-next / flip-in-prev，离场不保留。
+ * 语义仍是「向前翻从右侧带透视转入、向后翻反之」。
+ */
+.flip__stage {
+  --cap-h: 74vh;
+  display: flex;
+  justify-content: center;
+  perspective: 1600px;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.flip__spread {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  box-shadow: 0 18px 48px rgba(7, 42, 69, 0.16);
+  transform-origin: center center;
+  will-change: transform, opacity;
+}
+
+/*
+ * 纸宽 = min(可用宽的一半, 设计上限, 由视口高反推的宽)。
+ * 高度一律由纸宽乘 A4 比例算出 —— 视口不够高时整本等比缩小，而不是把纸压扁。
+ */
+.flip__stage[data-mode='spread'] .flip__sheet {
+  --w: min(46vw, 590px, calc(var(--cap-h) * 210 / 297));
+  width: var(--w);
+  height: calc(var(--w) * 297 / 210);
+}
+
+.flip__stage[data-mode='single'] .flip__sheet {
+  --w: min(92vw, 560px, calc(82vh * 210 / 297));
+  width: var(--w);
+  height: calc(var(--w) * 297 / 210);
+}
+
+.flip__sheet {
+  position: relative;
+  flex: 0 0 auto;
+  background: #fff;
+}
+
+.flip__sheet--blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: repeating-linear-gradient(-45deg, #fafafa, #fafafa 10px, #f3f4f6 10px, #f3f4f6 20px);
+  color: #b0b6bf;
+  font-size: 0.75rem;
+  letter-spacing: 0.2em;
+}
+
+/* 对开时中间那道书脊 */
+.flip__stage[data-mode='spread'] .flip__sheet:nth-child(odd)::after,
+.flip__stage[data-mode='spread'] .flip__sheet:nth-child(even)::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 18px;
+  pointer-events: none;
+}
+
+.flip__stage[data-mode='spread'] .flip__sheet:nth-child(odd)::after {
+  right: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.09));
+}
+
+.flip__stage[data-mode='spread'] .flip__sheet:nth-child(even)::before {
+  left: 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.09));
+}
+
+.flip__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.flip__meta {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.flip__toc {
+  width: 11rem;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 767px) {
+  .flip__toc {
+    display: none;
+  }
+}
+
+/* 方向感入场：横向位移 + 轻微透视旋转，配合 stage 的 perspective */
+@keyframes flip-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(5%) rotateY(-7deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes flip-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-5%) rotateY(7deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.flip-enter-next {
+  animation: flip-in-next 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.flip-enter-prev {
+  animation: flip-in-prev 0.22s cubic-bezier(0.22, 0.61, 0.36, 1);
+}

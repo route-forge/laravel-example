@@ -1,0 +1,112 @@
+/*
+ * 画册内页单页骨架样式（移植自 vue 分支 PageSheet.vue 的 scoped style，选择器不变）。
+ * 类名自带 sheet__ 前缀不会撞全局；版式差异走 [data-layout] / [data-tone] 属性选择器。
+ * cqw 单位依赖 .sheet 上的 container-type，让字号随「纸宽」而非视口缩放。
+ */
+.sheet {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #fff;
+  color: #1f2937;
+  container-type: inline-size;
+}
+
+/* 深色调版面：主题色压深打底，文字转白 */
+.sheet[data-tone='dark'] {
+  background: linear-gradient(160deg, #0d2f4d 0%, #072a45 55%, #041a2c 100%);
+  color: #f3f6f9;
+}
+
+.sheet__pad {
+  padding: clamp(1.25rem, 5.5%, 2.75rem);
+}
+
+.sheet__scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.sheet__display {
+  font-size: clamp(1.6rem, 4.6cqw, 2.6rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.sheet__h3 {
+  font-size: clamp(1.05rem, 3cqw, 1.4rem);
+  font-weight: 600;
+  line-height: 1.35;
+  margin-bottom: 1rem;
+}
+
+.sheet__prose p {
+  font-size: clamp(0.8125rem, 2.2cqw, 0.9375rem);
+  line-height: 1.95;
+  color: #4b5563;
+}
+
+.sheet[data-tone='dark'] .sheet__prose p {
+  color: #dbe4ee;
+}
+
+.sheet__prose p + p {
+  margin-top: 0.9rem;
+}
+
+.sheet__empty {
+  font-size: 0.8125rem;
+  color: #9ca3af;
+}
+
+/* 图 / 装饰面板 */
+.sheet__figure {
+  position: relative;
+  flex: 0 0 38%;
+  overflow: hidden;
+}
+
+.sheet__figure img,
+.sheet__figure > div {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.sheet__figure img {
+  object-fit: cover;
+}
+
+.sheet__glyph {
+  position: absolute;
+  right: 8%;
+  bottom: -0.35em;
+  font-size: 7.5em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.16);
+  user-select: none;
+}
+
+.sheet__overlay {
+  padding: clamp(1rem, 4.5%, 2rem);
+  background: linear-gradient(to top, rgba(4, 26, 44, 0.88), rgba(4, 26, 44, 0));
+  color: #f8fafc;
+}
+
+/* 页码：装订侧留白，靠外下角 */
+.sheet__num {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 1rem;
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.sheet[data-tone='dark'] .sheet__num {
+  color: rgba(255, 255, 255, 0.55);
+}

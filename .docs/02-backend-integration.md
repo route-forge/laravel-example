@@ -65,7 +65,9 @@ route-forge 不预设固定层级，层级完全由 `config/forge.php` 的 `leve
             'middleware' => ['manage'],
         ],
         'load' => 'lazy',
-        'endpoint_middleware' => ['manage'],   // 层级明细端点本身也要登录
+        // web 提供 StartSession，manage 做登录+is_manager 准入 —— 两者缺一不可：
+        // 只挂 manage 时明细端点没有会话上下文，已登录也恒 401，SPA 会陷入踢回登录页的死循环
+        'endpoint_middleware' => ['web', 'manage'],
     ],
 ],
 ```

@@ -114,6 +114,9 @@ navigate(forge('api.catalogs.show', { slug }));
 - `ForgeLink` / `ForgeRoute` 组件自带「未就绪渲染占位」行为
 
 如果已登录仍报错，检查后端该层级是否配了 `endpoint_middleware` 且中间件把当前用户拒了。
+**高频坑**：`endpoint_middleware` 只写 `['manage']` 漏了 `web` —— 没有 `StartSession`，
+明细端点对已登录用户也回 401，表现是「登录成功却永远进不去后台」的踢回死循环。
+自查：`php artisan route:list | grep _forge/routes`，manage 那条应显示 `[web, manage]`。
 
 ### Q: 类型文件不更新怎么办？
 

@@ -73,7 +73,9 @@ return [
                 'middleware' => ['manage'],
             ],
             'load'  => 'lazy',
-            'endpoint_middleware' => ['manage'],
+            // ⚠ 必须带上 web（StartSession）：没有会话，manage 中间件看不到已登录用户，
+            //    层级明细端点对任何登录态都回 401，前端懒加载 manage 层级会陷入踢回登录页的死循环。
+            'endpoint_middleware' => ['web', 'manage'],
         ],
     ],
 

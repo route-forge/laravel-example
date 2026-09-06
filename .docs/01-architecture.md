@@ -147,14 +147,16 @@ route-forge 不预设固定层级，层级完全由 `config/forge.php` 自定义
 | 层级      | load    | 归级方式                                    | endpoint_middleware | 用途                             |
 |-----------|---------|---------------------------------------------|---------------------|----------------------------------|
 | `public`  | `eager` | URI 前缀 `api` 自动命中（`match.prefix`）   | —                   | 前台画册数据，随首屏摘要注入     |
-| `manage`  | `lazy`  | URI 前缀 `manage` + `manage` 中间件（OR）   | `['manage']`        | 管理端接口，登录后懒加载         |
+| `manage`  | `lazy`  | URI 前缀 `manage` + `manage` 中间件（OR）   | `['web', 'manage']` | 管理端接口，登录后懒加载         |
 
 两个层级的关键差异：
 
 - **eager vs lazy**：`public` 的路由元信息随 `@forgeSummary` 进首屏 HTML（前台首屏就要用）；
   `manage` 只在登录后由 `useForgeApi({ level: 'manage' })` 按需拉取，不占公开页面体积
-- **端点保护**：`manage` 配了 `endpoint_middleware: ['manage']`，未登录者请求层级明细端点
-  `GET /_forge/routes/manage` 直接被拒 —— 路由名本身也是信息，一并保护
+- **端点保护**：`manage` 配了 `endpoint_middleware: ['web', 'manage']`，未登录者请求层级明细端点
+  `GET /_forge/routes/manage` 直接被拒 —— 路由名本身也是信息，一并保护。
+  **`web` 不可省**：它提供 `StartSession`；只挂 `manage` 时端点请求根本没有会话上下文，
+  连已登录用户也会被判定未登录（恒 401），SPA 懒加载层级后又被 401 兜底踢回登录页，形成死循环
 - **strict_mode**：本项目开启（`true`）。任何路由漏写归级直接抛异常（500），而不是静默掉进
   `unassigned` —— 宁可 fails-fast，也不要「路由明明在、类型和调用都不通」的暗坑
 

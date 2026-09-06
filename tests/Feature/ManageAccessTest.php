@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Routing\Route;
 use Tests\TestCase;
 
 /**
@@ -29,6 +30,23 @@ class ManageAccessTest extends TestCase
     {
         // endpoint_middleware：未登录者连「后台有哪些路由」都拿不到
         $this->getJson('/_forge/routes/manage')->assertUnauthorized();
+    }
+
+    public function test_管理层级明细端点声明会话与准入双中间件(): void
+    {
+        // 「后台无法启动」事故锚点：登录成功后 SPA 会 GET /_forge/routes/manage 懒加载层级明细，
+        // 该端点若只挂 manage 不挂 web（没有 StartSession），任何登录态都解析不出会话用户 → 恒 401，
+        // 401 兜底再把人踢回登录页，形成死循环。
+        // 刻意断言注册结果而非发真实请求：测试容器的 session 管理器跨请求共享，守卫即便重建也
+        // 读得到登录写入的会话，复现不了浏览器「只带 cookie」的链路，行为测试对缺 web 是假阴性。
+        $route = collect($this->app['router']->getRoutes()->getRoutes())
+            ->first(fn (Route $r) => $r->uri() === '_forge/routes/manage');
+
+        $this->assertNotNull($route, '未注册 manage 层级明细端点');
+
+        $middleware = (array) ($route->getAction('middleware') ?? []);
+        $this->assertContains('web', $middleware, '明细端点缺 web（StartSession）→ 登录态恒 401，后台陷入踢回登录页死循环');
+        $this->assertContains('manage', $middleware);
     }
 
     public function test_非管理员登录后仍是四零三(): void

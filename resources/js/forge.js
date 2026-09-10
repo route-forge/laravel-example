@@ -39,32 +39,30 @@ function handleUnauthorized(error) {
 
 const forge = createRouteForgePlugin();
 
-forge.ready().then((forge) => {
-  forge.interceptors.request.use((config) => {
-    if (csrf) {
-      config.headers = { ...config.headers, 'X-XSRF-TOKEN': csrf };
-    }
-    return config;
-  });
-
-  forge.interceptors.response.use(
-    function (response) {
-      updateCsrfFromSetCookie(response.headers['set-cookie']);
-      console.log('Response:', response);
-      return response;
-    },
-    function (error) {
-      if (error.response) {
-        const updated = updateCsrfFromSetCookie(error.response.headers['set-cookie']);
-        if (updated) {
-          console.log('🔄 XSRF-TOKEN 已从错误响应中更新');
-        }
-      }
-
-      console.error('Error:', error);
-      return Promise.reject(handleUnauthorized(error));
-    },
-  );
+forge.interceptors.request.use((config) => {
+  if (csrf) {
+    config.headers = { ...config.headers, 'X-XSRF-TOKEN': csrf };
+  }
+  return config;
 });
+
+forge.interceptors.response.use(
+  function (response) {
+    updateCsrfFromSetCookie(response.headers['set-cookie']);
+    console.log('Response:', response);
+    return response;
+  },
+  function (error) {
+    if (error.response) {
+      const updated = updateCsrfFromSetCookie(error.response.headers['set-cookie']);
+      if (updated) {
+        console.log('🔄 XSRF-TOKEN 已从错误响应中更新');
+      }
+    }
+
+    console.error('Error:', error);
+    return Promise.reject(handleUnauthorized(error));
+  },
+);
 
 export default forge;

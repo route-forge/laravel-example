@@ -8,19 +8,19 @@
     },
     "dependencies": {
         "@ant-design/icons": "^6.3.4",
-        "@route-forge/core": "^2.2.1",
-        "@route-forge/react": "^2.2.1",
-        "antd": "^6.6.2",
-        "react": "^19",
-        "react-dom": "^19",
+        "@route-forge/core": "^3.0.0",
+        "@route-forge/react": "^3.0.0",
+        "antd": "^6.6.3",
+        "react": "^19.2.8",
+        "react-dom": "^19.2.8",
         "react-router": "^8.3.1",
         "sortablejs": "^1.15.7"
     },
     "devDependencies": {
-        "@vitejs/plugin-react": "^6",
-        "laravel-vite-plugin": "^3.2",
-        "unocss": "^66",
-        "vite": "^8"
+        "@vitejs/plugin-react": "^6.1.1",
+        "laravel-vite-plugin": "^3.2.0",
+        "unocss": "^66.10.1",
+        "vite": "^8.2.2"
     },
     "optionalDependencies": {
         "@laravel/multiplex": "^0.4.3"

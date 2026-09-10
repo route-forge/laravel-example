@@ -25,6 +25,7 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+.trash
 
 resources/js/types/auto-imports.d.ts
 resources/js/types/components.d.ts
